@@ -97,6 +97,7 @@ export interface AppSettings {
   windowSize: WindowSizePreset
   actionGroupBindings: Record<TAgentState, string | null>
   aiTalk: AiTalkSettings
+  bubbleTheme: BubbleThemeSettings
 }
 
 export interface ModelScanResult {
@@ -287,4 +288,22 @@ export function createDefaultAiTalkSettings(): AiTalkSettings {
     headers: {},
     providerProfiles: {},
   }
+}
+
+export const BUBBLE_THEME_PRESETS = [
+  { id: 'pink',   accent: '#d45fa0' as string | null, text: '#3d2847' as string | null },
+  { id: 'blue',   accent: '#3a8fbf' as string | null, text: '#1a2e4a' as string | null },
+  { id: 'teal',   accent: '#2a9985' as string | null, text: '#1a3a35' as string | null },
+  { id: 'purple', accent: '#8040c0' as string | null, text: '#2a1a4a' as string | null },
+  { id: 'peach',  accent: '#e06030' as string | null, text: '#3a2015' as string | null },
+  { id: 'custom', accent: null,                       text: null                       },
+] as const
+
+export interface BubbleThemeSettings {
+  preset: string
+  customAccent: string
+}
+
+export function createDefaultBubbleTheme(): BubbleThemeSettings {
+  return { preset: 'pink', customAccent: '#d45fa0' }
 }

@@ -136,6 +136,28 @@ impl Default for AiTalkSettings {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct BubbleThemeSettings {
+    #[serde(default = "default_bubble_theme_preset")]
+    pub preset: String,
+    #[serde(default)]
+    pub custom_accent: String,
+}
+
+fn default_bubble_theme_preset() -> String {
+    "pink".to_string()
+}
+
+impl Default for BubbleThemeSettings {
+    fn default() -> Self {
+        Self {
+            preset: default_bubble_theme_preset(),
+            custom_accent: String::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub name: String,
     pub language: AppLanguage,
@@ -150,6 +172,8 @@ pub struct AppSettings {
     pub window_size: WindowSizePreset,
     pub action_group_bindings: BTreeMap<String, Option<String>>,
     pub ai_talk: AiTalkSettings,
+    #[serde(default)]
+    pub bubble_theme: BubbleThemeSettings,
 }
 
 fn default_true() -> bool {
@@ -169,6 +193,7 @@ impl Default for AppSettings {
             window_size: WindowSizePreset::Medium,
             action_group_bindings: default_action_group_bindings(),
             ai_talk: AiTalkSettings::default(),
+            bubble_theme: BubbleThemeSettings::default(),
         }
     }
 }

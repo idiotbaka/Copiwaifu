@@ -40,6 +40,11 @@ async function loadBootstrap() {
 }
 
 async function maybeCheckForUpdates() {
+  // Disable automatic update checks: This version is a fork and modification.
+  // The update server points to the official upstream repository. Enabling automatic updates may result in incorrect overwriting.
+  // To restore, simply delete this `return` statement.
+  return
+
   if (
     hasCheckedForUpdates
     || import.meta.env.DEV

@@ -1,7 +1,7 @@
 {
   "name": "copiwaifu",
   "private": true,
-  "version": "1.2.1",
+  "version": "1.2.1-idiotbaka",
   "type": "module",
   "scripts": {
     "dev": "vite",

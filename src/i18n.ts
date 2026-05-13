@@ -85,6 +85,9 @@ type LanguageCopy = {
     saveSuccess: string
     nameRequired: string
     nameTooLong: (max: number) => string
+    bubbleThemeLabel: string
+    bubbleThemeCustomLabel: string
+    bubbleThemePresetLabels: Record<string, string>
   }
   status: {
     launchFailed: string
@@ -179,6 +182,11 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       saveSuccess: 'Settings saved and now in effect.',
       nameRequired: 'Character name cannot be empty.',
       nameTooLong: max => `Character name can be at most ${max} characters.`,
+      bubbleThemeLabel: 'Bubble Theme',
+      bubbleThemeCustomLabel: 'Custom Accent Color',
+      bubbleThemePresetLabels: {
+        pink: 'Pink', blue: 'Blue', teal: 'Teal', purple: 'Purple', peach: 'Peach', custom: 'Custom',
+      },
     },
     status: {
       launchFailed: 'Launch Failed',
@@ -297,6 +305,11 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       saveSuccess: '设定已保存，马上生效。',
       nameRequired: '角色名不能为空。',
       nameTooLong: max => `角色名最多支持 ${max} 个字符。`,
+      bubbleThemeLabel: '气泡主题',
+      bubbleThemeCustomLabel: '自定义强调色',
+      bubbleThemePresetLabels: {
+        pink: '粉色', blue: '蓝色', teal: '青绿', purple: '紫色', peach: '橙桃', custom: '自定义',
+      },
     },
     status: {
       launchFailed: '启动失败',
@@ -415,6 +428,11 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       saveSuccess: '設定を保存しました。すぐに反映されます。',
       nameRequired: 'キャラクター名は空にできません。',
       nameTooLong: max => `キャラクター名は最大 ${max} 文字です。`,
+      bubbleThemeLabel: 'バブルテーマ',
+      bubbleThemeCustomLabel: 'カスタムアクセント色',
+      bubbleThemePresetLabels: {
+        pink: 'ピンク', blue: 'ブルー', teal: 'ティール', purple: 'パープル', peach: 'ピーチ', custom: 'カスタム',
+      },
     },
     status: {
       launchFailed: '起動に失敗しました',

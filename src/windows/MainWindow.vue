@@ -399,6 +399,8 @@ watch(
         :text="displayedText"
         :visible="isVisible"
         :window-size="props.bootstrap.settings.windowSize"
+        :character-name="props.bootstrap.settings.name"
+        :bubble-theme="props.bootstrap.settings.bubbleTheme"
       />
     </section>
 

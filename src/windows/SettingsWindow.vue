@@ -3,6 +3,7 @@ import type {
   AppBootstrap,
   AppSettings,
   AiTalkProviderProfile,
+  BubbleThemeSettings,
   ImportedModelResult,
   ModelScanResult,
   MotionGroupOption,
@@ -19,7 +20,9 @@ import {
   ACTION_GROUP_BINDING_SOURCE,
   AGENT_STATE_ORDER,
   APP_LANGUAGE,
+  BUBBLE_THEME_PRESETS,
   createDefaultAiTalkSettings,
+  createDefaultBubbleTheme,
   createEmptyActionGroupBindings,
   resolveActionGroupBinding,
   TYPING_SPEED_PRESET,
@@ -155,6 +158,10 @@ function createFormState(settings: AppSettings): AppSettings {
       ...settings.actionGroupBindings,
     },
     aiTalk,
+    bubbleTheme: {
+      preset: settings.bubbleTheme?.preset ?? 'pink',
+      customAccent: settings.bubbleTheme?.customAccent ?? '#d45fa0',
+    },
   }
 }
 
@@ -179,6 +186,7 @@ function applySettings(settings: AppSettings) {
     form.aiTalk.providerProfiles = cloneAiTalkProviderProfiles(next.aiTalk.providerProfiles)
     aiTalkHeadersText.value = JSON.stringify(next.aiTalk.headers, null, 2)
     aiTalkAdvancedOpen.value = shouldOpenAiTalkAdvanced(next.aiTalk)
+    form.bubbleTheme = { ...(next.bubbleTheme ?? createDefaultBubbleTheme()) }
 
     for (const state of AGENT_STATE_ORDER) {
       form.actionGroupBindings[state] = next.actionGroupBindings[state]
@@ -808,6 +816,40 @@ function sanitizeAiTalkHeaders(headers: Record<string, string>) {
       </div>
 
       <div class="field">
+        <span class="field__label">{{ ui.settings.bubbleThemeLabel }}</span>
+        <div class="theme-presets">
+          <button
+            v-for="preset in BUBBLE_THEME_PRESETS"
+            :key="preset.id"
+            type="button"
+            class="theme-swatch"
+            :class="{ 'theme-swatch--active': form.bubbleTheme.preset === preset.id }"
+            :title="ui.settings.bubbleThemePresetLabels[preset.id]"
+            :style="preset.accent ? { '--swatch-color': preset.accent } : {}"
+            @click="form.bubbleTheme.preset = preset.id"
+          >
+            <span
+              v-if="!preset.accent"
+              class="theme-swatch__custom-icon"
+            >✦</span>
+          </button>
+        </div>
+        <div
+          v-if="form.bubbleTheme.preset === 'custom'"
+          class="theme-custom"
+        >
+          <label class="theme-custom__label">
+            {{ ui.settings.bubbleThemeCustomLabel }}
+          </label>
+          <input
+            v-model="form.bubbleTheme.customAccent"
+            type="color"
+            class="theme-color-input"
+          >
+        </div>
+      </div>
+
+      <div class="field">
         <span class="field__label">{{ ui.settings.websiteLabel }}</span>
         <div class="model-picker">
           <button
@@ -1212,5 +1254,77 @@ function sanitizeAiTalkHeaders(headers: Record<string, string>) {
   color: #345250;
   box-shadow: none;
   border: 1px solid rgba(70, 107, 105, 0.16);
+}
+
+/* 气泡主题选择器 */
+.theme-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.theme-swatch {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.9);
+  outline: 2.5px solid transparent;
+  outline-offset: 1px;
+  background: color-mix(in srgb, var(--swatch-color, #c8c8c8) 72%, white);
+  cursor: pointer;
+  transition: transform 0.12s, outline-color 0.14s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.theme-swatch:not([style]) {
+  background: conic-gradient(
+    hsl(0,   70%, 80%) 0deg   60deg,
+    hsl(60,  70%, 80%) 60deg  120deg,
+    hsl(120, 60%, 75%) 120deg 180deg,
+    hsl(200, 70%, 80%) 180deg 240deg,
+    hsl(270, 60%, 80%) 240deg 300deg,
+    hsl(330, 70%, 80%) 300deg 360deg
+  );
+}
+
+.theme-swatch:hover {
+  transform: scale(1.12);
+}
+
+.theme-swatch--active {
+  outline-color: #3a5f5d;
+}
+
+.theme-swatch__custom-icon {
+  font-size: 15px;
+  color: #4a5a59;
+  line-height: 1;
+}
+
+.theme-custom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.theme-custom__label {
+  font-size: 12px;
+  color: #617a78;
+}
+
+.theme-color-input {
+  width: 44px;
+  height: 34px;
+  padding: 3px;
+  border: 1px solid rgba(70, 107, 105, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
 }
 </style>
