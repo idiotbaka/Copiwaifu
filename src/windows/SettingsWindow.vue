@@ -13,7 +13,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
-import { getLanguageCopy } from '../i18n'
+import { getLanguageCopy, getDefaultCommanderTitle } from '../i18n'
 import { readAvailableMotionGroups } from '../live2d/model'
 import {
   ACTION_GROUP_BINDING_SOURCE,
@@ -22,6 +22,7 @@ import {
   createDefaultAiTalkSettings,
   createEmptyActionGroupBindings,
   resolveActionGroupBinding,
+  TYPING_SPEED_PRESET,
   WINDOW_SIZE_PRESET,
 } from '../types/agent'
 import { MANUAL_UPDATE_WEBSITE_URL } from '../updater'
@@ -44,6 +45,7 @@ const currentScan = ref<ModelScanResult>(props.bootstrap.modelScan)
 const motionGroupOptions = ref<MotionGroupOption[]>(props.bootstrap.modelScan.availableMotionGroups)
 const ui = computed(() => getLanguageCopy(form.language))
 const detectedMotionGroupCount = computed(() => motionGroupOptions.value.length)
+const COMMANDER_TITLE_MAX_LENGTH = 20
 const NAME_MAX_LENGTH = 16
 const DEFAULT_MODEL_DIRECTORY = '/Resources/Yulia'
 const AI_TALK_PROVIDER_OPTIONS = [
@@ -143,6 +145,9 @@ function createFormState(settings: AppSettings): AppSettings {
     name: settings.name,
     language: settings.language,
     autoStart: settings.autoStart,
+    idleGreeting: settings.idleGreeting ?? true,
+    commanderTitle: settings.commanderTitle ?? '',
+    typingSpeed: settings.typingSpeed ?? TYPING_SPEED_PRESET.MEDIUM,
     modelDirectory: settings.modelDirectory,
     windowSize: settings.windowSize,
     actionGroupBindings: {
@@ -160,6 +165,9 @@ function applySettings(settings: AppSettings) {
     form.name = next.name
     form.language = next.language
     form.autoStart = next.autoStart
+    form.idleGreeting = next.idleGreeting
+    form.commanderTitle = next.commanderTitle
+    form.typingSpeed = next.typingSpeed
     form.modelDirectory = next.modelDirectory
     form.windowSize = next.windowSize
     form.aiTalk.enabled = next.aiTalk.enabled
@@ -529,6 +537,17 @@ function sanitizeAiTalkHeaders(headers: Record<string, string>) {
         >
       </label>
 
+      <label class="field field--switch">
+        <span>
+          <strong>{{ ui.settings.idleGreetingLabel }}</strong>
+          <small>{{ ui.settings.idleGreetingHint }}</small>
+        </span>
+        <input
+          v-model="form.idleGreeting"
+          type="checkbox"
+        >
+      </label>
+
       <div class="field ai-talk">
         <label class="field--switch">
           <span>
@@ -661,6 +680,56 @@ function sanitizeAiTalkHeaders(headers: Record<string, string>) {
           {{ ui.settings.nameCount([...form.name].length, NAME_MAX_LENGTH) }}
         </small>
       </label>
+
+      <label class="field">
+        <span class="field__label">{{ ui.settings.commanderTitleLabel }}</span>
+        <input
+          v-model="form.commanderTitle"
+          class="field__input"
+          :maxlength="COMMANDER_TITLE_MAX_LENGTH"
+          type="text"
+          :placeholder="getDefaultCommanderTitle(form.language)"
+        >
+        <small class="field__hint">{{ ui.settings.commanderTitleHint }}</small>
+      </label>
+
+      <div class="field">
+        <span class="field__label">{{ ui.settings.typingSpeedLabel }}</span>
+        <div class="size-grid">
+          <label class="choice">
+            <input
+              v-model="form.typingSpeed"
+              :value="TYPING_SPEED_PRESET.SLOW"
+              type="radio"
+            >
+            <span>{{ ui.typingSpeedLabels[TYPING_SPEED_PRESET.SLOW] }}</span>
+          </label>
+          <label class="choice">
+            <input
+              v-model="form.typingSpeed"
+              :value="TYPING_SPEED_PRESET.MEDIUM"
+              type="radio"
+            >
+            <span>{{ ui.typingSpeedLabels[TYPING_SPEED_PRESET.MEDIUM] }}</span>
+          </label>
+          <label class="choice">
+            <input
+              v-model="form.typingSpeed"
+              :value="TYPING_SPEED_PRESET.FAST"
+              type="radio"
+            >
+            <span>{{ ui.typingSpeedLabels[TYPING_SPEED_PRESET.FAST] }}</span>
+          </label>
+          <label class="choice">
+            <input
+              v-model="form.typingSpeed"
+              :value="TYPING_SPEED_PRESET.FASTEST"
+              type="radio"
+            >
+            <span>{{ ui.typingSpeedLabels[TYPING_SPEED_PRESET.FASTEST] }}</span>
+          </label>
+        </div>
+      </div>
 
       <div class="field">
         <span class="field__label">{{ ui.settings.uploadModelLabel }}</span>

@@ -10,7 +10,7 @@ import { useAgentState } from '../composables/useAgentState'
 import { useContextMenu } from '../composables/useContextMenu'
 import { useMainWindowLive2d } from '../composables/useMainWindowLive2d'
 import { limitAiTalkBubbleText, useSpeechBubble } from '../composables/useSpeechBubble'
-import { formatAgentLabel, getLanguageCopy } from '../i18n'
+import { formatAgentLabel, getDefaultCommanderTitle, getLanguageCopy } from '../i18n'
 import { AGENT_STATE } from '../types/agent'
 
 const props = defineProps<{
@@ -52,6 +52,11 @@ const visibilityLabel = computed(() => (
   ui.value.visibilityLabel(props.bootstrap.mainWindowVisible)
 ))
 
+const effectiveCommanderTitle = computed(() => (
+  props.bootstrap.settings.commanderTitle.trim()
+  || getDefaultCommanderTitle(props.bootstrap.settings.language)
+))
+
 const {
   playState,
   refreshCurrentState,
@@ -64,14 +69,16 @@ const {
   getActionGroupBindings: () => props.bootstrap.settings.actionGroupBindings,
   getFallbackMotionGroups: () => props.bootstrap.modelScan.availableMotionGroups,
   onModelReady: () => {
-    say(randomGreeting(), 2800)
-    startIdleGreetingLoop()
+    if (props.bootstrap.settings.idleGreeting) {
+      say(randomGreeting(), 2800, props.bootstrap.settings.typingSpeed)
+      startIdleGreetingLoop()
+    }
     void refreshCurrentState()
   },
 })
 
 function greetingLines(name: string) {
-  return ui.value.pet.greetings(name)
+  return ui.value.pet.greetings(name, effectiveCommanderTitle.value)
 }
 
 function randomGreeting() {
@@ -108,7 +115,7 @@ function bubbleTextForState(state: TAgentState) {
     return ui.value.pet.complete(agentLabel, name)
   }
   if (state === AGENT_STATE.NEEDS_ATTENTION) {
-    return ui.value.pet.needsAttention(agentLabel, name)
+    return ui.value.pet.needsAttention(agentLabel, name, effectiveCommanderTitle.value)
   }
   return ''
 }
@@ -155,7 +162,7 @@ function isAiTalkTerminalState(state: TAgentState) {
 
 function showStateBubble(text: string, duration = 2200) {
   lastStateBubbleShownAt = Date.now()
-  say(text, duration)
+  say(text, duration, props.bootstrap.settings.typingSpeed)
 }
 
 async function showAiTalkOrFallback(state: TAgentState, fallbackText: string) {
@@ -238,8 +245,15 @@ function startIdleGreetingLoop() {
     if (currentState.value !== AGENT_STATE.IDLE) {
       return
     }
-    say(randomGreeting(), 2600)
+    say(randomGreeting(), 2600, props.bootstrap.settings.typingSpeed)
   }, 18000)
+}
+
+function stopIdleGreetingLoop() {
+  if (idleGreetingTimer) {
+    clearInterval(idleGreetingTimer)
+    idleGreetingTimer = null
+  }
 }
 
 async function openSettings() {
@@ -353,6 +367,17 @@ watch(
     void refreshCurrentState()
   },
   { deep: true },
+)
+
+watch(
+  () => props.bootstrap.settings.idleGreeting,
+  (enabled) => {
+    if (enabled) {
+      startIdleGreetingLoop()
+    } else {
+      stopIdleGreetingLoop()
+    }
+  },
 )
 </script>
 

@@ -52,6 +52,21 @@ impl Default for WindowSizePreset {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TypingSpeedPreset {
+    Slow,
+    Medium,
+    Fast,
+    Fastest,
+}
+
+impl Default for TypingSpeedPreset {
+    fn default() -> Self {
+        Self::Medium
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum AppLanguage {
@@ -125,10 +140,20 @@ pub struct AppSettings {
     pub name: String,
     pub language: AppLanguage,
     pub auto_start: bool,
+    #[serde(default = "default_true")]
+    pub idle_greeting: bool,
+    #[serde(default)]
+    pub commander_title: String,
+    #[serde(default)]
+    pub typing_speed: TypingSpeedPreset,
     pub model_directory: Option<String>,
     pub window_size: WindowSizePreset,
     pub action_group_bindings: BTreeMap<String, Option<String>>,
     pub ai_talk: AiTalkSettings,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for AppSettings {
@@ -137,6 +162,9 @@ impl Default for AppSettings {
             name: "Yulia".to_string(),
             language: AppLanguage::English,
             auto_start: false,
+            idle_greeting: true,
+            commander_title: String::new(),
+            typing_speed: TypingSpeedPreset::Medium,
             model_directory: None,
             window_size: WindowSizePreset::Medium,
             action_group_bindings: default_action_group_bindings(),
@@ -193,6 +221,9 @@ struct PersistedAppSettings {
     name: Option<String>,
     language: Option<AppLanguage>,
     auto_start: Option<bool>,
+    idle_greeting: Option<bool>,
+    commander_title: Option<String>,
+    typing_speed: Option<TypingSpeedPreset>,
     model_directory: Option<String>,
     window_size: Option<WindowSizePreset>,
     action_group_bindings: Option<BTreeMap<String, Option<String>>>,
@@ -458,6 +489,15 @@ fn merge_persisted_settings(persisted: PersistedAppSettings) -> AppSettings {
     if let Some(auto_start) = persisted.auto_start {
         settings.auto_start = auto_start;
     }
+    if let Some(idle_greeting) = persisted.idle_greeting {
+        settings.idle_greeting = idle_greeting;
+    }
+    if let Some(commander_title) = persisted.commander_title {
+        settings.commander_title = commander_title;
+    }
+    if let Some(typing_speed) = persisted.typing_speed {
+        settings.typing_speed = typing_speed;
+    }
     if persisted.model_directory.is_some() {
         settings.model_directory = persisted.model_directory;
     }
@@ -482,6 +522,7 @@ fn normalize_loaded_settings(settings: &mut AppSettings) {
     if settings.name.is_empty() || settings.name.chars().count() > NAME_MAX_LENGTH {
         settings.name = AppSettings::default().name;
     }
+    settings.commander_title = settings.commander_title.trim().to_string();
     settings.action_group_bindings =
         merge_action_group_bindings(settings.action_group_bindings.clone());
     settings.ai_talk = sanitize_ai_talk_settings(settings.ai_talk.clone());
@@ -495,6 +536,7 @@ fn normalize_user_settings(settings: &mut AppSettings) -> Result<(), String> {
     if settings.name.chars().count() > NAME_MAX_LENGTH {
         return Err(name_too_long_message(settings.language, NAME_MAX_LENGTH));
     }
+    settings.commander_title = settings.commander_title.trim().to_string();
     settings.action_group_bindings =
         merge_action_group_bindings(settings.action_group_bindings.clone());
     settings.ai_talk = sanitize_ai_talk_settings(settings.ai_talk.clone());

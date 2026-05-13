@@ -1,12 +1,14 @@
 import {
   AGENT_STATE,
   APP_LANGUAGE,
+  TYPING_SPEED_PRESET,
   WINDOW_SIZE_PRESET,
 } from './types/agent'
 import type {
   AgentType,
   AppLanguage,
   TAgentState,
+  TypingSpeedPreset,
   WindowSizePreset,
 } from './types/agent'
 
@@ -32,6 +34,11 @@ type LanguageCopy = {
     versionLabel: string
     autoStartLabel: string
     autoStartHint: string
+    idleGreetingLabel: string
+    idleGreetingHint: string
+    commanderTitleLabel: string
+    commanderTitleHint: string
+    typingSpeedLabel: string
     aiTalkLabel: string
     aiTalkHint: string
     aiTalkProviderLabel: string
@@ -85,14 +92,15 @@ type LanguageCopy = {
   }
   stateLabels: Record<TAgentState, string>
   windowSizeLabels: Record<WindowSizePreset, string>
+  typingSpeedLabels: Record<TypingSpeedPreset, string>
   visibilityLabel: (visible: boolean) => string
   pet: {
-    greetings: (name: string) => string[]
+    greetings: (name: string, commanderTitle: string) => string[]
     thinking: (agentLabel: string, name: string) => string
     toolUse: (agentLabel: string, name: string, toolName: string | null) => string
     error: (agentLabel: string, name: string) => string
     complete: (agentLabel: string, name: string) => string
-    needsAttention: (agentLabel: string, name: string) => string
+    needsAttention: (agentLabel: string, name: string, commanderTitle: string) => string
     idleResume: (agentLabel: string, name: string) => string
   }
 }
@@ -120,6 +128,11 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       versionLabel: 'Current Version',
       autoStartLabel: 'Launch at Login',
       autoStartHint: 'After saving, this will sync with the system login launch setting so she can boot up with you.',
+      idleGreetingLabel: 'Idle Greetings',
+      idleGreetingHint: 'When enabled, she will occasionally say hello while on standby. Turn this off for a quieter desk.',
+      commanderTitleLabel: 'Your Title',
+      commanderTitleHint: 'How the pet addresses you. Leave empty to use the default (Commander).',
+      typingSpeedLabel: 'Bubble Typing Speed',
       aiTalkLabel: 'AI Talk',
       aiTalkHint: 'Copiwaifu can engage in interesting chat interactions based on the conversation context of your AI tools like CC and Codex.',
       aiTalkProviderLabel: 'Provider',
@@ -186,13 +199,19 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       [WINDOW_SIZE_PRESET.LARGE]: 'Large',
       [WINDOW_SIZE_PRESET.HUGE]: 'Huge',
     },
+    typingSpeedLabels: {
+      [TYPING_SPEED_PRESET.SLOW]: 'Slow',
+      [TYPING_SPEED_PRESET.MEDIUM]: 'Medium',
+      [TYPING_SPEED_PRESET.FAST]: 'Fast',
+      [TYPING_SPEED_PRESET.FASTEST]: 'Instant',
+    },
     visibilityLabel: visible => (visible ? 'Hide for Now' : 'Return to Stage'),
     pet: {
-      greetings: name => [
-        `Commander! ${name} is on station and ready to watch over your AI sessions today.`,
+      greetings: (name, commanderTitle) => [
+        `${commanderTitle}! ${name} is on station and ready to watch over your AI sessions today.`,
         `${name} is on standby. Just give the order and I will get to work.`,
         `${name} will keep an eye on tool status and approval requests so nothing runs wild.`,
-        'Commander! We have finished syncing with CC, Codex, and Copilot.',
+        `${commanderTitle}! We have finished syncing with CC, Codex, and Copilot.`,
         'Let us change this world together!',
       ],
       thinking: (agentLabel, name) => `[${agentLabel}] ${name}'s thought circuits are spinning at full speed...`,
@@ -201,7 +220,7 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
         : `[${agentLabel}] ${name} is processing a spell...`,
       error: (agentLabel, name) => `[${agentLabel}] ${name} detected a bit of unusual turbulence on this side.`,
       complete: (agentLabel, name) => `[${agentLabel}] ${name} has taken the task down cleanly.`,
-      needsAttention: (agentLabel, name) => `[${agentLabel}] ${name} needs the commander to take a look.`,
+      needsAttention: (agentLabel, name, commanderTitle) => `[${agentLabel}] ${name} needs ${commanderTitle} to take a look.`,
       idleResume: (agentLabel, name) => `${agentLabel} has finished this round. ${name} is returning to standby.`,
     },
   },
@@ -227,6 +246,11 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       versionLabel: '当前版本',
       autoStartLabel: '开机自启',
       autoStartHint: '保存后会和系统登录启动状态同步，让她陪你一起开机报到。',
+      idleGreetingLabel: '待机打招呼',
+      idleGreetingHint: '开启后，她会在待机时偶尔和你打招呼。想要安静点可以关掉这个。',
+      commanderTitleLabel: '对你的称呼',
+      commanderTitleHint: '她对你的称呼，留空则使用默认称呼（长官）。',
+      typingSpeedLabel: '气泡打字速度',
       aiTalkLabel: 'AI Talk',
       aiTalkHint: 'Copiwaifu 可以基于你的CC、Codex等AI工具的回话上下文来进行有意思的聊天互动。',
       aiTalkProviderLabel: '模型供应商',
@@ -293,13 +317,19 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       [WINDOW_SIZE_PRESET.LARGE]: '大只',
       [WINDOW_SIZE_PRESET.HUGE]: '超大只',
     },
+    typingSpeedLabels: {
+      [TYPING_SPEED_PRESET.SLOW]: '慢',
+      [TYPING_SPEED_PRESET.MEDIUM]: '中',
+      [TYPING_SPEED_PRESET.FAST]: '快',
+      [TYPING_SPEED_PRESET.FASTEST]: '最快',
+    },
     visibilityLabel: visible => (visible ? '暂时隐身' : '重新登场'),
     pet: {
-      greetings: name => [
-        `长官！${name} 已经到岗，今天也由我来守着你的 AI 会话。`,
-        `${name} 待机中，长官一声令下我就开工。`,
+      greetings: (name, commanderTitle) => [
+        `${commanderTitle}！${name} 已经到岗，今天也由我来守着你的 AI 会话。`,
+        `${name} 待机中，${commanderTitle}一声令下我就开工。`,
         `${name} 会帮你盯住工具状态和授权请求，不会让它们乱跑。`,
-        '长官！我们已经与CC、Codex、Copilot同步完成。',
+        `${commanderTitle}！我们已经与CC、Codex、Copilot同步完成。`,
         '让我们一起改变这个世界吧！',
       ],
       thinking: (agentLabel, name) => `[${agentLabel}] ${name} 的思考回路正在高速运转...`,
@@ -308,7 +338,7 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
         : `[${agentLabel}] ${name} 正在施法处理中...`,
       error: (agentLabel, name) => `[${agentLabel}] ${name} 这边捕捉到一点异常波动。`,
       complete: (agentLabel, name) => `[${agentLabel}] ${name} 已经把任务顺利拿下。`,
-      needsAttention: (agentLabel, name) => `[${agentLabel}] ${name} 需要长官看一眼。`,
+      needsAttention: (agentLabel, name, commanderTitle) => `[${agentLabel}] ${name} 需要${commanderTitle}看一眼。`,
       idleResume: (agentLabel, name) => `${agentLabel} 这一轮结束啦，接下来由 ${name} 继续待机。`,
     },
   },
@@ -334,6 +364,11 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       versionLabel: '現在のバージョン',
       autoStartLabel: 'ログイン時に起動',
       autoStartHint: '保存後、システムのログイン起動設定と同期し、起動時に一緒に立ち上がります。',
+      idleGreetingLabel: '待機中の挨拶',
+      idleGreetingHint: 'オンにすると、待機中にときどき話しかけてきます。静かにしたい場合はオフにしてください。',
+      commanderTitleLabel: 'あなたの呼び名',
+      commanderTitleHint: 'ペットがあなたを呼ぶ名前です。空欄にするとデフォルト（指揮官）が使われます。',
+      typingSpeedLabel: 'バブル打鍵速度',
       aiTalkLabel: 'AI Talk',
       aiTalkHint: 'Copiwaifu はあなたの CC、Codex などの AI ツールの会話コンテキストに基づいて、面白いチャットインタラクションを行うことができます。',
       aiTalkProviderLabel: 'プロバイダー',
@@ -400,13 +435,19 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       [WINDOW_SIZE_PRESET.LARGE]: '大きめ',
       [WINDOW_SIZE_PRESET.HUGE]: '特大',
     },
+    typingSpeedLabels: {
+      [TYPING_SPEED_PRESET.SLOW]: '遅い',
+      [TYPING_SPEED_PRESET.MEDIUM]: '普通',
+      [TYPING_SPEED_PRESET.FAST]: '速い',
+      [TYPING_SPEED_PRESET.FASTEST]: '即時',
+    },
     visibilityLabel: visible => (visible ? 'いったん隠す' : '再登場'),
     pet: {
-      greetings: name => [
-        `指揮官！${name} は配置につきました。今日も AI セッションを見守ります。`,
+      greetings: (name, commanderTitle) => [
+        `${commanderTitle}！${name} は配置につきました。今日も AI セッションを見守ります。`,
         `${name} は待機中です。命令があればすぐに動きます。`,
         `${name} がツールの状態と承認リクエストを見張って、暴走しないようにします。`,
-        '指揮官！CC、Codex、Copilot との同期が完了しました。',
+        `${commanderTitle}！CC、Codex、Copilot との同期が完了しました。`,
         '一緒にこの世界を変えていきましょう！',
       ],
       thinking: (agentLabel, name) => `[${agentLabel}] ${name} の思考回路がフル回転しています...`,
@@ -415,7 +456,7 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
         : `[${agentLabel}] ${name} が処理を実行しています...`,
       error: (agentLabel, name) => `[${agentLabel}] ${name} が少し異常な揺らぎを検知しました。`,
       complete: (agentLabel, name) => `[${agentLabel}] ${name} がタスクをきれいに片づけました。`,
-      needsAttention: (agentLabel, name) => `[${agentLabel}] ${name} が指揮官の確認を求めています。`,
+      needsAttention: (agentLabel, name, commanderTitle) => `[${agentLabel}] ${name} が${commanderTitle}の確認を求めています。`,
       idleResume: (agentLabel, name) => `${agentLabel} の今回の処理は完了です。${name} は待機に戻ります。`,
     },
   },
@@ -423,6 +464,12 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
 
 export function getLanguageCopy(language: AppLanguage) {
   return LANGUAGE_COPY[language] ?? LANGUAGE_COPY[APP_LANGUAGE.ENGLISH]
+}
+
+export function getDefaultCommanderTitle(language: AppLanguage): string {
+  if (language === APP_LANGUAGE.CHINESE) return '长官'
+  if (language === APP_LANGUAGE.JAPANESE) return '指揮官'
+  return 'Commander'
 }
 
 export function formatAgentLabel(agent: AgentType | null, language: AppLanguage) {

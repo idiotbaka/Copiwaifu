@@ -1,10 +1,16 @@
 import { ref } from 'vue'
-import { APP_LANGUAGE, WINDOW_SIZE_PRESET } from '../types/agent'
-import type { AppLanguage, WindowSizePreset } from '../types/agent'
+import { APP_LANGUAGE, TYPING_SPEED_PRESET, WINDOW_SIZE_PRESET } from '../types/agent'
+import type { AppLanguage, TypingSpeedPreset, WindowSizePreset } from '../types/agent'
 
 const MAX_TEXT_LENGTH = 100
-const TYPING_SPEED = 60
 const DEFAULT_DURATION = 3000
+
+const TYPING_SPEED_MS: Record<TypingSpeedPreset, number> = {
+  [TYPING_SPEED_PRESET.SLOW]: 120,
+  [TYPING_SPEED_PRESET.MEDIUM]: 60,
+  [TYPING_SPEED_PRESET.FAST]: 25,
+  [TYPING_SPEED_PRESET.FASTEST]: 0,
+}
 const AI_TALK_LIMITS: Record<WindowSizePreset, { cjk: number, latin: number }> = {
   [WINDOW_SIZE_PRESET.TINY]: { cjk: 24, latin: 45 },
   [WINDOW_SIZE_PRESET.SMALL]: { cjk: 36, latin: 70 },
@@ -39,15 +45,29 @@ export function useSpeechBubble() {
     displayedText.value = ''
   }
 
-  function say(text: string, duration = DEFAULT_DURATION) {
+  function say(text: string, duration = DEFAULT_DURATION, speed: TypingSpeedPreset = TYPING_SPEED_PRESET.MEDIUM) {
     clearTimers()
 
     fullText = text.length > MAX_TEXT_LENGTH
       ? `${text.slice(0, MAX_TEXT_LENGTH)}…`
       : text
-    charIndex = 0
-    displayedText.value = ''
+
+    // If the text starts with a [label] prefix, display it immediately
+    // and only apply the typewriter effect to the rest.
+    const prefixMatch = fullText.match(/^\[[^\]]+\]\s*/)
+    const prefix = prefixMatch ? prefixMatch[0] : ''
+    charIndex = prefix.length
+
+    displayedText.value = prefix
     isVisible.value = true
+
+    const intervalMs = TYPING_SPEED_MS[speed]
+
+    if (intervalMs === 0 || charIndex >= fullText.length) {
+      displayedText.value = fullText
+      hideTimer = setTimeout(hide, duration)
+      return
+    }
 
     typingTimer = setInterval(() => {
       if (charIndex < fullText.length) {
@@ -59,7 +79,7 @@ export function useSpeechBubble() {
         typingTimer = null
         hideTimer = setTimeout(hide, duration)
       }
-    }, TYPING_SPEED)
+    }, intervalMs)
   }
 
   return { isVisible, displayedText, say, hide }

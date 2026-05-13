@@ -40,6 +40,15 @@ export const WINDOW_SIZE_PRESET = {
 
 export type WindowSizePreset = typeof WINDOW_SIZE_PRESET[keyof typeof WINDOW_SIZE_PRESET]
 
+export const TYPING_SPEED_PRESET = {
+  SLOW: 'slow',
+  MEDIUM: 'medium',
+  FAST: 'fast',
+  FASTEST: 'fastest',
+} as const
+
+export type TypingSpeedPreset = typeof TYPING_SPEED_PRESET[keyof typeof TYPING_SPEED_PRESET]
+
 export interface MotionGroupOption {
   id: string
   group: string
@@ -81,6 +90,9 @@ export interface AppSettings {
   name: string
   language: AppLanguage
   autoStart: boolean
+  idleGreeting: boolean
+  commanderTitle: string
+  typingSpeed: TypingSpeedPreset
   modelDirectory: string | null
   windowSize: WindowSizePreset
   actionGroupBindings: Record<TAgentState, string | null>
