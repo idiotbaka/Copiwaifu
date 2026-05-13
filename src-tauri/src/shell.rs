@@ -33,6 +33,7 @@ const BACKUP_CUSTOM_MODEL_DIR_NAME: &str = "current.backup";
 const DEFAULT_AI_TALK_PROVIDER: &str = "openai";
 const MENU_OPEN_SETTINGS: &str = "open-settings";
 const MENU_TOGGLE_VISIBILITY: &str = "toggle-visibility";
+const MENU_TOGGLE_MOUSE_PASSTHROUGH: &str = "toggle-mouse-passthrough";
 const MENU_EXIT: &str = "exit-app";
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -181,6 +182,7 @@ pub struct ShellState {
     pub(crate) settings: AppSettings,
     model_scan: ModelScanResult,
     main_window_visible: bool,
+    mouse_passthrough: bool,
 }
 
 pub struct ShellStore(pub Arc<Mutex<ShellState>>);
@@ -428,6 +430,7 @@ fn load_shell_state(app_handle: &AppHandle) -> Result<ShellState, String> {
         settings,
         model_scan,
         main_window_visible: true,
+        mouse_passthrough: false,
     })
 }
 
@@ -586,7 +589,11 @@ fn custom_models_root(app_handle: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn create_tray(app_handle: &AppHandle) -> tauri::Result<()> {
-    let menu = tray_menu(app_handle, current_main_window_visibility(app_handle));
+    let menu = tray_menu(
+        app_handle,
+        current_main_window_visibility(app_handle),
+        current_mouse_passthrough(app_handle),
+    );
     let icon = Image::from_bytes(include_bytes!("../icons/icon.png"))?;
 
     TrayIconBuilder::with_id(TRAY_ID)
@@ -607,6 +614,11 @@ fn create_tray(app_handle: &AppHandle) -> tauri::Result<()> {
                     let _ = toggle_main_window_visibility_inner(app, &shell, &navigator);
                 }
             }
+            MENU_TOGGLE_MOUSE_PASSTHROUGH => {
+                if let Some(shell) = app.try_state::<ShellStore>() {
+                    let _ = toggle_mouse_passthrough_inner(app, &shell);
+                }
+            }
             MENU_EXIT => app.exit(0),
             _ => {}
         })
@@ -620,18 +632,27 @@ fn update_tray_menu(app_handle: &AppHandle) -> tauri::Result<()> {
         tray.set_menu(Some(tray_menu(
             app_handle,
             current_main_window_visibility(app_handle),
+            current_mouse_passthrough(app_handle),
         )))?;
     }
     Ok(())
 }
 
-fn tray_menu(app_handle: &AppHandle, visible: bool) -> tauri::menu::Menu<tauri::Wry> {
+fn tray_menu(
+    app_handle: &AppHandle,
+    visible: bool,
+    mouse_passthrough: bool,
+) -> tauri::menu::Menu<tauri::Wry> {
     let language = current_language(app_handle);
     MenuBuilder::new(app_handle)
         .text(MENU_OPEN_SETTINGS, settings_menu_label(language))
         .text(
             MENU_TOGGLE_VISIBILITY,
             visibility_menu_label(visible, language),
+        )
+        .text(
+            MENU_TOGGLE_MOUSE_PASSTHROUGH,
+            mouse_passthrough_menu_label(mouse_passthrough, language),
         )
         .text(MENU_EXIT, exit_menu_label(language))
         .build()
@@ -643,6 +664,33 @@ fn current_language(app_handle: &AppHandle) -> AppLanguage {
         .try_state::<ShellStore>()
         .and_then(|shell| shell.0.lock().ok().map(|state| state.settings.language))
         .unwrap_or_default()
+}
+
+fn current_mouse_passthrough(app_handle: &AppHandle) -> bool {
+    app_handle
+        .try_state::<ShellStore>()
+        .and_then(|shell| shell.0.lock().ok().map(|state| state.mouse_passthrough))
+        .unwrap_or(false)
+}
+
+fn toggle_mouse_passthrough_inner(
+    app_handle: &AppHandle,
+    shell: &tauri::State<'_, ShellStore>,
+) -> Result<(), String> {
+    let next_passthrough = {
+        let state = shell.0.lock().map_err(|err| err.to_string())?;
+        !state.mouse_passthrough
+    };
+    let window = main_window(app_handle)?;
+    window
+        .set_ignore_cursor_events(next_passthrough)
+        .map_err(|err| err.to_string())?;
+    {
+        let mut shell_state = shell.0.lock().map_err(|err| err.to_string())?;
+        shell_state.mouse_passthrough = next_passthrough;
+    }
+    update_tray_menu(app_handle).map_err(|err| err.to_string())?;
+    Ok(())
 }
 
 fn open_or_focus_settings_window(app_handle: &AppHandle) -> Result<(), String> {
@@ -1185,6 +1233,17 @@ fn visibility_menu_label(visible: bool, language: AppLanguage) -> &'static str {
         (false, AppLanguage::Chinese) => "显示",
         (true, AppLanguage::Japanese) => "隠す",
         (false, AppLanguage::Japanese) => "表示",
+    }
+}
+
+fn mouse_passthrough_menu_label(enabled: bool, language: AppLanguage) -> &'static str {
+    match (enabled, language) {
+        (false, AppLanguage::English) => "Enable Mouse Passthrough",
+        (true, AppLanguage::English) => "Disable Mouse Passthrough",
+        (false, AppLanguage::Chinese) => "开启鼠标穿透",
+        (true, AppLanguage::Chinese) => "关闭鼠标穿透",
+        (false, AppLanguage::Japanese) => "マウス透過を有効にする",
+        (true, AppLanguage::Japanese) => "マウス透過を無効にする",
     }
 }
 
