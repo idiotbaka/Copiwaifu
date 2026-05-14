@@ -98,6 +98,7 @@ export interface AppSettings {
   actionGroupBindings: Record<TAgentState, string | null>
   aiTalk: AiTalkSettings
   bubbleTheme: BubbleThemeSettings
+  sessionTimeoutSecs: number
 }
 
 export interface ModelScanResult {

@@ -3,7 +3,6 @@ import type {
   AppBootstrap,
   AppSettings,
   AiTalkProviderProfile,
-  BubbleThemeSettings,
   ImportedModelResult,
   ModelScanResult,
   MotionGroupOption,
@@ -162,6 +161,7 @@ function createFormState(settings: AppSettings): AppSettings {
       preset: settings.bubbleTheme?.preset ?? 'pink',
       customAccent: settings.bubbleTheme?.customAccent ?? '#d45fa0',
     },
+    sessionTimeoutSecs: settings.sessionTimeoutSecs ?? 300,
   }
 }
 
@@ -187,6 +187,7 @@ function applySettings(settings: AppSettings) {
     aiTalkHeadersText.value = JSON.stringify(next.aiTalk.headers, null, 2)
     aiTalkAdvancedOpen.value = shouldOpenAiTalkAdvanced(next.aiTalk)
     form.bubbleTheme = { ...(next.bubbleTheme ?? createDefaultBubbleTheme()) }
+    form.sessionTimeoutSecs = next.sessionTimeoutSecs
 
     for (const state of AGENT_STATE_ORDER) {
       form.actionGroupBindings[state] = next.actionGroupBindings[state]
@@ -740,6 +741,20 @@ function sanitizeAiTalkHeaders(headers: Record<string, string>) {
       </div>
 
       <div class="field">
+        <label class="field__label" for="session-timeout-input">{{ ui.settings.sessionTimeoutLabel }}</label>
+        <input
+          id="session-timeout-input"
+          v-model.number="form.sessionTimeoutSecs"
+          class="field__input field__input--short"
+          type="number"
+          min="10"
+          max="86400"
+          step="1"
+        >
+        <small class="field__hint">{{ ui.settings.sessionTimeoutHint }}</small>
+      </div>
+
+      <div class="field">
         <span class="field__label">{{ ui.settings.uploadModelLabel }}</span>
         <div class="model-picker">
           <button
@@ -1055,6 +1070,10 @@ function sanitizeAiTalkHeaders(headers: Record<string, string>) {
   resize: vertical;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   line-height: 1.45;
+}
+
+.field__input--short {
+  width: 120px;
 }
 
 .field__hint,

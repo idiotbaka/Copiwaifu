@@ -50,13 +50,13 @@ async function maybeCheckForUpdates() {
     || import.meta.env.DEV
     || windowLabel.value !== 'main'
     || !bootstrap.value
-    || !bootstrap.value.mainWindowVisible
+    || !bootstrap.value?.mainWindowVisible
   ) {
     return
   }
 
   try {
-    await checkForAppUpdates(bootstrap.value.settings.language ?? APP_LANGUAGE.ENGLISH)
+    await checkForAppUpdates(bootstrap.value?.settings.language ?? APP_LANGUAGE.ENGLISH)
     hasCheckedForUpdates = true
   }
   catch (error) {

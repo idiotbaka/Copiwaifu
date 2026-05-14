@@ -38,7 +38,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "resources": [
       "../sidecar/ai-runtime/bundle/main.mjs"
     ],

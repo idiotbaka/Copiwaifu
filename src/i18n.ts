@@ -88,6 +88,8 @@ type LanguageCopy = {
     bubbleThemeLabel: string
     bubbleThemeCustomLabel: string
     bubbleThemePresetLabels: Record<string, string>
+    sessionTimeoutLabel: string
+    sessionTimeoutHint: string
   }
   status: {
     launchFailed: string
@@ -187,6 +189,8 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       bubbleThemePresetLabels: {
         pink: 'Pink', blue: 'Blue', teal: 'Teal', purple: 'Purple', peach: 'Peach', custom: 'Custom',
       },
+      sessionTimeoutLabel: 'Session Timeout',
+      sessionTimeoutHint: 'How long to wait without new events before treating the session as ended. Increase this if the pet incorrectly shows idle during long thinking tasks.',
     },
     status: {
       launchFailed: 'Launch Failed',
@@ -310,6 +314,8 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       bubbleThemePresetLabels: {
         pink: '粉色', blue: '蓝色', teal: '青绿', purple: '紫色', peach: '橙桃', custom: '自定义',
       },
+      sessionTimeoutLabel: '会话超时时间(秒)',
+      sessionTimeoutHint: '在没有收到新事件的情况下，等待多久后将会话视为已结束。如果 AI 工具长时间卡在思考中被误判为结束，请调大此值。',
     },
     status: {
       launchFailed: '启动失败',
@@ -433,6 +439,8 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       bubbleThemePresetLabels: {
         pink: 'ピンク', blue: 'ブルー', teal: 'ティール', purple: 'パープル', peach: 'ピーチ', custom: 'カスタム',
       },
+      sessionTimeoutLabel: 'セッションタイムアウト(秒)',
+      sessionTimeoutHint: '新しいイベントが届かない場合に、セッションが終了したと判断するまでの待ち時間です。AI ツールが長時間思考中にアイドルと誤判定される場合は、この値を大きくしてください。',
     },
     status: {
       launchFailed: '起動に失敗しました',

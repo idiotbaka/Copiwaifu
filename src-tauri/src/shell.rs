@@ -174,10 +174,16 @@ pub struct AppSettings {
     pub ai_talk: AiTalkSettings,
     #[serde(default)]
     pub bubble_theme: BubbleThemeSettings,
+    #[serde(default = "default_session_timeout_secs")]
+    pub session_timeout_secs: u32,
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_session_timeout_secs() -> u32 {
+    300
 }
 
 impl Default for AppSettings {
@@ -194,6 +200,7 @@ impl Default for AppSettings {
             action_group_bindings: default_action_group_bindings(),
             ai_talk: AiTalkSettings::default(),
             bubble_theme: BubbleThemeSettings::default(),
+            session_timeout_secs: default_session_timeout_secs(),
         }
     }
 }
@@ -255,6 +262,7 @@ struct PersistedAppSettings {
     ai_talk: Option<AiTalkSettings>,
     #[serde(rename = "actionBindings")]
     legacy_action_bindings: Option<BTreeMap<String, Option<String>>>,
+    session_timeout_secs: Option<u32>,
 }
 
 pub mod commands {
@@ -352,7 +360,15 @@ pub fn init(app: &mut App) -> tauri::Result<()> {
     apply_main_window_size(&main_window, &state.settings.window_size)?;
     state.main_window_visible = main_window.is_visible().unwrap_or(true);
 
+    let session_timeout_secs = state.settings.session_timeout_secs;
     app.manage(ShellStore(Arc::new(Mutex::new(state))));
+
+    if let Some(navigator) = app.try_state::<NavigatorStore>() {
+        if let Ok(mut nav) = navigator.0.lock() {
+            nav.set_session_ttl(session_timeout_secs as u64);
+        }
+    }
+
     create_tray(app.handle())?;
 
     Ok(())
@@ -442,6 +458,13 @@ fn save_settings_inner(
         let mut shell_state = shell.0.lock().map_err(|err| err.to_string())?;
         shell_state.settings = settings;
         shell_state.model_scan = model_scan;
+    }
+
+    {
+        let timeout_secs = shell.0.lock().map_err(|err| err.to_string())?.settings.session_timeout_secs;
+        if let Ok(mut nav) = navigator.0.lock() {
+            nav.set_session_ttl(timeout_secs as u64);
+        }
     }
 
     update_tray_menu(app_handle).map_err(|err| err.to_string())?;
@@ -537,6 +560,9 @@ fn merge_persisted_settings(persisted: PersistedAppSettings) -> AppSettings {
     }
     if let Some(ai_talk) = persisted.ai_talk {
         settings.ai_talk = sanitize_ai_talk_settings(ai_talk);
+    }
+    if let Some(session_timeout_secs) = persisted.session_timeout_secs {
+        settings.session_timeout_secs = session_timeout_secs.max(10);
     }
 
     settings

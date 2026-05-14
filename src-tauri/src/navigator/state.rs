@@ -70,6 +70,7 @@ pub struct NavigatorState {
     last_sessions_snapshot: Option<NavigatorSessionsPayload>,
     ai_talk_claims: HashMap<String, Instant>,
     ai_talk_context_cache: HashMap<String, (AiTalkContext, Instant)>,
+    session_ttl: Duration,
 }
 
 impl NavigatorState {
@@ -82,7 +83,12 @@ impl NavigatorState {
             last_sessions_snapshot: None,
             ai_talk_claims: HashMap::new(),
             ai_talk_context_cache: HashMap::new(),
+            session_ttl: SESSION_TTL,
         }
+    }
+
+    pub fn set_session_ttl(&mut self, secs: u64) {
+        self.session_ttl = Duration::from_secs(secs.max(10));
     }
 
     pub fn set_server_port(&mut self, port: u16) {
@@ -194,7 +200,7 @@ impl NavigatorState {
 
     fn cleanup_stale_at(&mut self, now: Instant) -> Vec<NavigatorEmission> {
         self.sessions
-            .retain(|_, session| now.duration_since(session.updated_at) < SESSION_TTL);
+            .retain(|_, session| now.duration_since(session.updated_at) < self.session_ttl);
 
         self.ai_talk_claims
             .retain(|_, claimed_at| now.duration_since(*claimed_at) < Duration::from_secs(300));
