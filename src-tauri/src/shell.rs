@@ -8,7 +8,8 @@ use std::{
 use serde::{Deserialize, Serialize};
 use tauri::{
     image::Image, menu::MenuBuilder, tray::TrayIconBuilder, App, AppHandle, Emitter, LogicalSize,
-    Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    Manager, Monitor, PhysicalPosition, PhysicalSize, State, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder,
 };
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use tauri_plugin_autostart::ManagerExt as _;
@@ -34,6 +35,7 @@ const DEFAULT_AI_TALK_PROVIDER: &str = "openai";
 const MENU_OPEN_SETTINGS: &str = "open-settings";
 const MENU_TOGGLE_VISIBILITY: &str = "toggle-visibility";
 const MENU_TOGGLE_MOUSE_PASSTHROUGH: &str = "toggle-mouse-passthrough";
+const MENU_RESET_POSITION: &str = "reset-position";
 const MENU_EXIT: &str = "exit-app";
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -176,6 +178,10 @@ pub struct AppSettings {
     pub bubble_theme: BubbleThemeSettings,
     #[serde(default = "default_session_timeout_secs")]
     pub session_timeout_secs: u32,
+    #[serde(default)]
+    pub window_position: Option<[i32; 2]>,
+    #[serde(default)]
+    pub mouse_passthrough: bool,
 }
 
 fn default_true() -> bool {
@@ -201,6 +207,8 @@ impl Default for AppSettings {
             ai_talk: AiTalkSettings::default(),
             bubble_theme: BubbleThemeSettings::default(),
             session_timeout_secs: default_session_timeout_secs(),
+            window_position: None,
+            mouse_passthrough: false,
         }
     }
 }
@@ -263,6 +271,8 @@ struct PersistedAppSettings {
     #[serde(rename = "actionBindings")]
     legacy_action_bindings: Option<BTreeMap<String, Option<String>>>,
     session_timeout_secs: Option<u32>,
+    window_position: Option<[i32; 2]>,
+    mouse_passthrough: Option<bool>,
 }
 
 pub mod commands {
@@ -358,6 +368,16 @@ pub fn init(app: &mut App) -> tauri::Result<()> {
         })?;
 
     apply_main_window_size(&main_window, &state.settings.window_size)?;
+
+    let position_cleared = apply_saved_window_position(&main_window, &mut state.settings);
+    if position_cleared {
+        let _ = persist_settings(app.handle(), &state.settings);
+    }
+
+    if state.settings.mouse_passthrough {
+        let _ = main_window.set_ignore_cursor_events(true);
+    }
+
     state.main_window_visible = main_window.is_visible().unwrap_or(true);
 
     let session_timeout_secs = state.settings.session_timeout_secs;
@@ -436,6 +456,12 @@ fn save_settings_inner(
     navigator: &State<'_, NavigatorStore>,
     mut settings: AppSettings,
 ) -> Result<AppBootstrap, String> {
+    // Preserve internally-managed fields not exposed in the settings UI
+    {
+        let state = shell.0.lock().map_err(|err| err.to_string())?;
+        settings.window_position = state.settings.window_position;
+        settings.mouse_passthrough = state.settings.mouse_passthrough;
+    }
     normalize_user_settings(&mut settings)?;
 
     let model_scan = if let Some(model_directory) = settings.model_directory.as_deref() {
@@ -505,11 +531,12 @@ fn load_shell_state(app_handle: &AppHandle) -> Result<ShellState, String> {
         eprintln!("[shell] autostart sync skipped during startup: {err}");
     }
 
+    let mouse_passthrough = settings.mouse_passthrough;
     Ok(ShellState {
         settings,
         model_scan,
         main_window_visible: true,
-        mouse_passthrough: false,
+        mouse_passthrough,
     })
 }
 
@@ -563,6 +590,10 @@ fn merge_persisted_settings(persisted: PersistedAppSettings) -> AppSettings {
     }
     if let Some(session_timeout_secs) = persisted.session_timeout_secs {
         settings.session_timeout_secs = session_timeout_secs.max(10);
+    }
+    settings.window_position = persisted.window_position;
+    if let Some(mouse_passthrough) = persisted.mouse_passthrough {
+        settings.mouse_passthrough = mouse_passthrough;
     }
 
     settings
@@ -712,6 +743,11 @@ fn create_tray(app_handle: &AppHandle) -> tauri::Result<()> {
                     let _ = toggle_mouse_passthrough_inner(app, &shell);
                 }
             }
+            MENU_RESET_POSITION => {
+                if let Some(shell) = app.try_state::<ShellStore>() {
+                    let _ = reset_window_position_inner(app, &shell);
+                }
+            }
             MENU_EXIT => app.exit(0),
             _ => {}
         })
@@ -747,6 +783,7 @@ fn tray_menu(
             MENU_TOGGLE_MOUSE_PASSTHROUGH,
             mouse_passthrough_menu_label(mouse_passthrough, language),
         )
+        .text(MENU_RESET_POSITION, reset_position_menu_label(language))
         .text(MENU_EXIT, exit_menu_label(language))
         .build()
         .expect("failed to build tray menu")
@@ -778,10 +815,13 @@ fn toggle_mouse_passthrough_inner(
     window
         .set_ignore_cursor_events(next_passthrough)
         .map_err(|err| err.to_string())?;
-    {
+    let settings_to_save = {
         let mut shell_state = shell.0.lock().map_err(|err| err.to_string())?;
         shell_state.mouse_passthrough = next_passthrough;
-    }
+        shell_state.settings.mouse_passthrough = next_passthrough;
+        shell_state.settings.clone()
+    };
+    persist_settings(app_handle, &settings_to_save)?;
     update_tray_menu(app_handle).map_err(|err| err.to_string())?;
     Ok(())
 }
@@ -1483,6 +1523,114 @@ fn is_missing_autostart_entry_error(message: &str) -> bool {
         || message.contains("No such file")
         || message.contains("cannot find the file")
         || message.contains("找不到指定的文件")
+}
+
+fn is_position_within_any_monitor(
+    monitors: &[Monitor],
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> bool {
+    // Check that the top-center of the window is visible on at least one monitor
+    let center_x = x + (width as i32 / 2);
+    let check_y = y + (height as i32 / 4).min(80);
+    monitors.iter().any(|m| {
+        let pos = m.position();
+        let size = m.size();
+        center_x >= pos.x
+            && center_x < pos.x + size.width as i32
+            && check_y >= pos.y
+            && check_y < pos.y + size.height as i32
+    })
+}
+
+/// Applies the saved window position with multi-monitor bounds validation.
+/// Returns true if the saved position was invalid and has been cleared.
+fn apply_saved_window_position(window: &WebviewWindow, settings: &mut AppSettings) -> bool {
+    let Some([x, y]) = settings.window_position else {
+        return false;
+    };
+    let (win_width, win_height) = match window.outer_size() {
+        Ok(PhysicalSize { width, height }) => (width, height),
+        Err(_) => {
+            let (lw, lh) = window_size_dimensions(&settings.window_size);
+            (lw as u32, lh as u32)
+        }
+    };
+    let in_bounds = window
+        .available_monitors()
+        .ok()
+        .filter(|monitors| !monitors.is_empty())
+        .map(|monitors| is_position_within_any_monitor(&monitors, x, y, win_width, win_height))
+        .unwrap_or(true); // trust the saved position if we can't query monitors
+    if in_bounds {
+        let _ = window.set_position(PhysicalPosition::new(x, y));
+        false
+    } else {
+        settings.window_position = None;
+        true
+    }
+}
+
+fn reset_window_position_inner(
+    app_handle: &AppHandle,
+    shell: &tauri::State<'_, ShellStore>,
+) -> Result<(), String> {
+    let window = main_window(app_handle)?;
+    let primary = window.primary_monitor().ok().flatten();
+    if let Some(monitor) = primary {
+        let mon_pos = monitor.position();
+        let mon_size = monitor.size();
+        let win_size = window
+            .outer_size()
+            .unwrap_or_else(|_| PhysicalSize::new(400, 760));
+        let center_x = mon_pos.x + (mon_size.width as i32 - win_size.width as i32) / 2;
+        let center_y = mon_pos.y + (mon_size.height as i32 - win_size.height as i32) / 2;
+        window
+            .set_position(PhysicalPosition::new(
+                center_x.max(mon_pos.x),
+                center_y.max(mon_pos.y),
+            ))
+            .map_err(|err| err.to_string())?;
+    }
+    let settings_to_save = {
+        let mut state = shell.0.lock().map_err(|err| err.to_string())?;
+        state.settings.window_position = None;
+        state.settings.clone()
+    };
+    persist_settings(app_handle, &settings_to_save)
+}
+
+/// Called from the window-moved event listener in lib.rs.
+pub fn save_window_position(app_handle: &AppHandle, x: i32, y: i32) {
+    let Some(shell) = app_handle.try_state::<ShellStore>() else {
+        return;
+    };
+    let settings_to_save = {
+        let Ok(mut state) = shell.0.lock() else {
+            return;
+        };
+        let already_saved = state
+            .settings
+            .window_position
+            .map(|[px, py]| px == x && py == y)
+            .unwrap_or(false);
+        if already_saved {
+            return;
+        }
+        state.settings.window_position = Some([x, y]);
+        state.settings.clone()
+    }; // mutex released before file write
+    let _ = persist_settings(app_handle, &settings_to_save);
+}
+
+fn reset_position_menu_label(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Reset Position",
+        AppLanguage::Chinese => "恢复默认位置",
+        AppLanguage::Japanese => "位置をリセット",
+    }
 }
 
 fn read_runtime_port() -> Option<u16> {

@@ -99,6 +99,13 @@ pub fn run() {
             #[cfg(not(target_os = "macos"))]
             window.set_always_on_top(true)?;
 
+            let app_handle_for_move = app.handle().clone();
+            window.on_window_event(move |event| {
+                if let tauri::WindowEvent::Moved(position) = event {
+                    shell::save_window_position(&app_handle_for_move, position.x, position.y);
+                }
+            });
+
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
