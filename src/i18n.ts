@@ -7,6 +7,7 @@ import {
 import type {
   AgentType,
   AppLanguage,
+  CustomPetMessageKey,
   TAgentState,
   TypingSpeedPreset,
   WindowSizePreset,
@@ -90,6 +91,13 @@ type LanguageCopy = {
     bubbleThemePresetLabels: Record<string, string>
     sessionTimeoutLabel: string
     sessionTimeoutHint: string
+    bubbleDurationLabel: string
+    bubbleDurationHint: string
+    customMessagesLabel: string
+    customMessagesHint: string
+    customMessagesEmpty: string
+    customMessagesVarHint: (vars: string[]) => string
+    customMessageTypeLabels: Record<CustomPetMessageKey, string>
   }
   status: {
     launchFailed: string
@@ -191,6 +199,21 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       },
       sessionTimeoutLabel: 'Session Timeout',
       sessionTimeoutHint: 'How long to wait without new events before treating the session as ended. Increase this if the pet incorrectly shows idle during long thinking tasks.',
+      bubbleDurationLabel: 'Bubble Display Duration (seconds)',
+      bubbleDurationHint: 'How long each speech bubble stays visible after the typing animation finishes.',
+      customMessagesLabel: 'Custom Bubble Messages',
+      customMessagesHint: 'Customize what the pet says for each state. One message per line, picked randomly. Leave empty to use the built-in default.',
+      customMessagesEmpty: 'One message per line — leave empty to use the default',
+      customMessagesVarHint: vars => `Available: ${vars.join('  ')}`,
+      customMessageTypeLabels: {
+        greetings: 'Idle Greetings',
+        thinking: 'Thinking',
+        toolUse: 'Tool Use',
+        error: 'Error',
+        complete: 'Complete',
+        needsAttention: 'Needs Attention',
+        idleResume: 'Return to Idle',
+      },
     },
     status: {
       launchFailed: 'Launch Failed',
@@ -316,6 +339,21 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       },
       sessionTimeoutLabel: '会话超时时间(秒)',
       sessionTimeoutHint: '在没有收到新事件的情况下，等待多久后将会话视为已结束。如果 AI 工具长时间卡在思考中被误判为结束，请调大此值。',
+      bubbleDurationLabel: '气泡显示时长(秒)',
+      bubbleDurationHint: '打字动画结束后，气泡继续显示的时间。',
+      customMessagesLabel: '自定义气泡消息',
+      customMessagesHint: '自定义桌宠在各状态下的说话内容，每行一条随机抽取，留空则使用内置默认消息。',
+      customMessagesEmpty: '每行一条消息，留空则使用默认',
+      customMessagesVarHint: vars => `可用变量：${vars.join('  ')}`,
+      customMessageTypeLabels: {
+        greetings: '待机打招呼',
+        thinking: '思考中',
+        toolUse: '工具调用',
+        error: '出错',
+        complete: '完成',
+        needsAttention: '需要关注',
+        idleResume: '返回待机',
+      },
     },
     status: {
       launchFailed: '启动失败',
@@ -441,6 +479,21 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       },
       sessionTimeoutLabel: 'セッションタイムアウト(秒)',
       sessionTimeoutHint: '新しいイベントが届かない場合に、セッションが終了したと判断するまでの待ち時間です。AI ツールが長時間思考中にアイドルと誤判定される場合は、この値を大きくしてください。',
+      bubbleDurationLabel: 'バブル表示時間(秒)',
+      bubbleDurationHint: 'タイピングアニメーション終了後、吹き出しが表示され続ける時間です。',
+      customMessagesLabel: 'カスタムバブルメッセージ',
+      customMessagesHint: '各状態でのペットの発話をカスタマイズします。1行1メッセージでランダムに選択されます。空欄にするとデフォルトが使われます。',
+      customMessagesEmpty: '1行1メッセージ — 空欄にするとデフォルトを使用',
+      customMessagesVarHint: vars => `使用可能：${vars.join('  ')}`,
+      customMessageTypeLabels: {
+        greetings: '待機中の挨拶',
+        thinking: '思考中',
+        toolUse: 'ツール使用中',
+        error: 'エラー',
+        complete: '完了',
+        needsAttention: '要確認',
+        idleResume: '待機に戻る',
+      },
     },
     status: {
       launchFailed: '起動に失敗しました',
@@ -490,6 +543,58 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
 
 export function getLanguageCopy(language: AppLanguage) {
   return LANGUAGE_COPY[language] ?? LANGUAGE_COPY[APP_LANGUAGE.ENGLISH]
+}
+
+const PET_MESSAGE_TEMPLATES: Record<AppLanguage, Record<CustomPetMessageKey, string>> = {
+  [APP_LANGUAGE.ENGLISH]: {
+    greetings: [
+      '{commanderTitle}! {name} is on station and ready to watch over your AI sessions today.',
+      '{name} is on standby. Just give the order and I will get to work.',
+      '{name} will keep an eye on tool status and approval requests so nothing runs wild.',
+      '{commanderTitle}! We have finished syncing with CC, Codex, and Copilot.',
+      'Let us change this world together!',
+    ].join('\n'),
+    thinking: "[{agentLabel}] {name}'s thought circuits are spinning at full speed...",
+    toolUse: '[{agentLabel}] {name} is casting a skill: {toolName}',
+    error: '[{agentLabel}] {name} detected a bit of unusual turbulence on this side.',
+    complete: '[{agentLabel}] {name} has taken the task down cleanly.',
+    needsAttention: '[{agentLabel}] {name} needs {commanderTitle} to take a look.',
+    idleResume: '{agentLabel} has finished this round. {name} is returning to standby.',
+  },
+  [APP_LANGUAGE.CHINESE]: {
+    greetings: [
+      '{commanderTitle}！{name} 已经到岗，今天也由我来守着你的 AI 会话。',
+      '{name} 待机中，{commanderTitle}一声令下我就开工。',
+      '{name} 会帮你盯住工具状态和授权请求，不会让它们乱跑。',
+      '{commanderTitle}！我们已经与CC、Codex、Copilot同步完成。',
+      '让我们一起改变这个世界吧！',
+    ].join('\n'),
+    thinking: '[{agentLabel}] {name} 的思考回路正在高速运转...',
+    toolUse: '[{agentLabel}] {name} 正在释放技能：{toolName}',
+    error: '[{agentLabel}] {name} 这边捕捉到一点异常波动。',
+    complete: '[{agentLabel}] {name} 已经把任务顺利拿下。',
+    needsAttention: '[{agentLabel}] {name} 需要{commanderTitle}看一眼。',
+    idleResume: '{agentLabel} 这一轮结束啦，接下来由 {name} 继续待机。',
+  },
+  [APP_LANGUAGE.JAPANESE]: {
+    greetings: [
+      '{commanderTitle}！{name} は配置につきました。今日も AI セッションを見守ります。',
+      '{name} は待機中です。命令があればすぐに動きます。',
+      '{name} がツールの状態と承認リクエストを見張って、暴走しないようにします。',
+      '{commanderTitle}！CC、Codex、Copilot との同期が完了しました。',
+      '一緒にこの世界を変えていきましょう！',
+    ].join('\n'),
+    thinking: '[{agentLabel}] {name} の思考回路がフル回転しています...',
+    toolUse: '[{agentLabel}] {name} がスキルを発動中: {toolName}',
+    error: '[{agentLabel}] {name} が少し異常な揺らぎを検知しました。',
+    complete: '[{agentLabel}] {name} がタスクをきれいに片づけました。',
+    needsAttention: '[{agentLabel}] {name} が{commanderTitle}の確認を求めています。',
+    idleResume: '{agentLabel} の今回の処理は完了です。{name} は待機に戻ります。',
+  },
+}
+
+export function getDefaultPetMessageTemplates(language: AppLanguage): Record<CustomPetMessageKey, string> {
+  return PET_MESSAGE_TEMPLATES[language] ?? PET_MESSAGE_TEMPLATES[APP_LANGUAGE.ENGLISH]
 }
 
 export function getDefaultCommanderTitle(language: AppLanguage): string {

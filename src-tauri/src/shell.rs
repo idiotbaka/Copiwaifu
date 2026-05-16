@@ -178,10 +178,14 @@ pub struct AppSettings {
     pub bubble_theme: BubbleThemeSettings,
     #[serde(default = "default_session_timeout_secs")]
     pub session_timeout_secs: u32,
+    #[serde(default = "default_bubble_duration_secs")]
+    pub bubble_duration_secs: u32,
     #[serde(default)]
     pub window_position: Option<[i32; 2]>,
     #[serde(default)]
     pub mouse_passthrough: bool,
+    #[serde(default)]
+    pub custom_messages: Option<serde_json::Value>,
 }
 
 fn default_true() -> bool {
@@ -190,6 +194,10 @@ fn default_true() -> bool {
 
 fn default_session_timeout_secs() -> u32 {
     300
+}
+
+fn default_bubble_duration_secs() -> u32 {
+    5
 }
 
 impl Default for AppSettings {
@@ -207,8 +215,10 @@ impl Default for AppSettings {
             ai_talk: AiTalkSettings::default(),
             bubble_theme: BubbleThemeSettings::default(),
             session_timeout_secs: default_session_timeout_secs(),
+            bubble_duration_secs: default_bubble_duration_secs(),
             window_position: None,
             mouse_passthrough: false,
+            custom_messages: None,
         }
     }
 }
@@ -271,8 +281,10 @@ struct PersistedAppSettings {
     #[serde(rename = "actionBindings")]
     legacy_action_bindings: Option<BTreeMap<String, Option<String>>>,
     session_timeout_secs: Option<u32>,
+    bubble_duration_secs: Option<u32>,
     window_position: Option<[i32; 2]>,
     mouse_passthrough: Option<bool>,
+    custom_messages: Option<serde_json::Value>,
 }
 
 pub mod commands {
@@ -591,10 +603,14 @@ fn merge_persisted_settings(persisted: PersistedAppSettings) -> AppSettings {
     if let Some(session_timeout_secs) = persisted.session_timeout_secs {
         settings.session_timeout_secs = session_timeout_secs.max(10);
     }
+    if let Some(bubble_duration_secs) = persisted.bubble_duration_secs {
+        settings.bubble_duration_secs = bubble_duration_secs.clamp(1, 60);
+    }
     settings.window_position = persisted.window_position;
     if let Some(mouse_passthrough) = persisted.mouse_passthrough {
         settings.mouse_passthrough = mouse_passthrough;
     }
+    settings.custom_messages = persisted.custom_messages;
 
     settings
 }

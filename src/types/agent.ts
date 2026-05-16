@@ -86,6 +86,22 @@ export interface AiTalkSettings {
   providerProfiles: Record<string, AiTalkProviderProfile>
 }
 
+export const CUSTOM_PET_MESSAGE_KEYS = [
+  'greetings',
+  'thinking',
+  'toolUse',
+  'error',
+  'complete',
+  'needsAttention',
+  'idleResume',
+] as const
+
+export type CustomPetMessageKey = typeof CUSTOM_PET_MESSAGE_KEYS[number]
+
+export type CustomPetMessages = Partial<Record<CustomPetMessageKey, string[]>>
+
+export type CustomPetMessagesConfig = Partial<Record<AppLanguage, CustomPetMessages>>
+
 export interface AppSettings {
   name: string
   language: AppLanguage
@@ -99,6 +115,8 @@ export interface AppSettings {
   aiTalk: AiTalkSettings
   bubbleTheme: BubbleThemeSettings
   sessionTimeoutSecs: number
+  bubbleDurationSecs: number
+  customMessages?: CustomPetMessagesConfig
 }
 
 export interface ModelScanResult {

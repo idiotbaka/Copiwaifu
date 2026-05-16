@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type {
   AppBootstrap,
+  AppLanguage,
   AppSettings,
   AiTalkProviderProfile,
+  CustomPetMessageKey,
+  CustomPetMessagesConfig,
   ImportedModelResult,
   ModelScanResult,
   MotionGroupOption,
@@ -13,13 +16,14 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
-import { getLanguageCopy, getDefaultCommanderTitle } from '../i18n'
+import { getLanguageCopy, getDefaultCommanderTitle, getDefaultPetMessageTemplates } from '../i18n'
 import { readAvailableMotionGroups } from '../live2d/model'
 import {
   ACTION_GROUP_BINDING_SOURCE,
   AGENT_STATE_ORDER,
   APP_LANGUAGE,
   BUBBLE_THEME_PRESETS,
+  CUSTOM_PET_MESSAGE_KEYS,
   createDefaultAiTalkSettings,
   createDefaultBubbleTheme,
   createEmptyActionGroupBindings,
@@ -40,9 +44,40 @@ const successMessage = ref('')
 const modelMessage = ref('')
 const isLoadingMotionGroups = ref(false)
 const aiTalkHeadersText = ref('')
+const customMessagesOpen = ref(false)
+const selectedCustomMessageLanguage = ref<AppLanguage>(APP_LANGUAGE.ENGLISH)
 
 const form = reactive<AppSettings>(createFormState(props.bootstrap.settings))
 const aiTalkAdvancedOpen = ref(false)
+
+type CustomMessagesText = Record<AppLanguage, Record<CustomPetMessageKey, string>>
+
+function createEmptyCustomMessagesText(): CustomMessagesText {
+  const emptyRow = () => Object.fromEntries(CUSTOM_PET_MESSAGE_KEYS.map(k => [k, ''])) as Record<CustomPetMessageKey, string>
+  return {
+    [APP_LANGUAGE.ENGLISH]: emptyRow(),
+    [APP_LANGUAGE.CHINESE]: emptyRow(),
+    [APP_LANGUAGE.JAPANESE]: emptyRow(),
+  }
+}
+
+const customMessagesText = reactive<CustomMessagesText>(createEmptyCustomMessagesText())
+
+const CUSTOM_MESSAGE_VARS: Record<CustomPetMessageKey, string[]> = {
+  greetings: ['{name}', '{commanderTitle}'],
+  thinking: ['{name}', '{agentLabel}'],
+  toolUse: ['{name}', '{agentLabel}', '{toolName}'],
+  error: ['{name}', '{agentLabel}'],
+  complete: ['{name}', '{agentLabel}'],
+  needsAttention: ['{name}', '{agentLabel}', '{commanderTitle}'],
+  idleResume: ['{name}', '{agentLabel}'],
+}
+
+const CUSTOM_MESSAGE_LANGUAGE_LABELS: Record<AppLanguage, string> = {
+  [APP_LANGUAGE.ENGLISH]: 'EN',
+  [APP_LANGUAGE.CHINESE]: '中文',
+  [APP_LANGUAGE.JAPANESE]: '日本語',
+}
 const currentScan = ref<ModelScanResult>(props.bootstrap.modelScan)
 const motionGroupOptions = ref<MotionGroupOption[]>(props.bootstrap.modelScan.availableMotionGroups)
 const ui = computed(() => getLanguageCopy(form.language))
@@ -162,6 +197,7 @@ function createFormState(settings: AppSettings): AppSettings {
       customAccent: settings.bubbleTheme?.customAccent ?? '#d45fa0',
     },
     sessionTimeoutSecs: settings.sessionTimeoutSecs ?? 300,
+    bubbleDurationSecs: settings.bubbleDurationSecs ?? 5,
   }
 }
 
@@ -188,10 +224,13 @@ function applySettings(settings: AppSettings) {
     aiTalkAdvancedOpen.value = shouldOpenAiTalkAdvanced(next.aiTalk)
     form.bubbleTheme = { ...(next.bubbleTheme ?? createDefaultBubbleTheme()) }
     form.sessionTimeoutSecs = next.sessionTimeoutSecs
+    form.bubbleDurationSecs = next.bubbleDurationSecs
 
     for (const state of AGENT_STATE_ORDER) {
       form.actionGroupBindings[state] = next.actionGroupBindings[state]
     }
+
+    loadCustomMessagesText(settings.customMessages)
   } finally {
     isApplyingSettings = false
   }
@@ -266,6 +305,36 @@ function applyAiTalkProviderProfile(provider: string) {
 
 function headersFromTextOrCurrent() {
   return parseAiTalkHeaders() ?? { ...form.aiTalk.headers }
+}
+
+function loadCustomMessagesText(config: CustomPetMessagesConfig | null | undefined) {
+  for (const lang of Object.values(APP_LANGUAGE) as AppLanguage[]) {
+    const defaults = getDefaultPetMessageTemplates(lang)
+    const langConfig = config?.[lang]
+    for (const key of CUSTOM_PET_MESSAGE_KEYS) {
+      if (langConfig && key in langConfig) {
+        customMessagesText[lang][key] = (langConfig[key] ?? []).join('\n')
+      }
+      else {
+        customMessagesText[lang][key] = defaults[key]
+      }
+    }
+  }
+}
+
+function buildCustomMessagesConfig(): CustomPetMessagesConfig {
+  const config: CustomPetMessagesConfig = {}
+  for (const lang of Object.values(APP_LANGUAGE) as AppLanguage[]) {
+    const langMsgs: Partial<Record<CustomPetMessageKey, string[]>> = {}
+    for (const key of CUSTOM_PET_MESSAGE_KEYS) {
+      langMsgs[key] = customMessagesText[lang][key]
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => s.length > 0)
+    }
+    config[lang] = langMsgs
+  }
+  return config
 }
 
 function clearNotice() {
@@ -424,6 +493,7 @@ async function save() {
           modelId: form.aiTalk.modelId.trim(),
           providerProfiles: sanitizeAiTalkProviderProfiles(form.aiTalk.providerProfiles),
         },
+        customMessages: buildCustomMessagesConfig(),
       },
     })
 
@@ -556,6 +626,62 @@ function sanitizeAiTalkHeaders(headers: Record<string, string>) {
           type="checkbox"
         >
       </label>
+
+      <div class="field custom-messages">
+        <button
+          class="advanced-toggle"
+          type="button"
+          :aria-expanded="customMessagesOpen"
+          @click="customMessagesOpen = !customMessagesOpen"
+        >
+          <span>
+            <strong>{{ ui.settings.customMessagesLabel }}</strong>
+            <small>{{ ui.settings.customMessagesHint }}</small>
+          </span>
+          <span
+            class="advanced-toggle__chevron"
+            :class="{ 'advanced-toggle__chevron--open': customMessagesOpen }"
+            aria-hidden="true"
+          />
+        </button>
+
+        <div
+          v-if="customMessagesOpen"
+          class="custom-messages__content"
+        >
+          <div class="custom-messages__tabs">
+            <button
+              v-for="lang in Object.values(APP_LANGUAGE)"
+              :key="lang"
+              type="button"
+              class="custom-messages__tab"
+              :class="{ 'custom-messages__tab--active': selectedCustomMessageLanguage === lang }"
+              @click="selectedCustomMessageLanguage = lang"
+            >
+              {{ CUSTOM_MESSAGE_LANGUAGE_LABELS[lang] }}
+            </button>
+          </div>
+
+          <div class="custom-messages__fields">
+            <div
+              v-for="key in CUSTOM_PET_MESSAGE_KEYS"
+              :key="key"
+              class="field"
+            >
+              <label class="field__label">{{ ui.settings.customMessageTypeLabels[key] }}</label>
+              <textarea
+                v-model="customMessagesText[selectedCustomMessageLanguage][key]"
+                class="field__textarea"
+                rows="3"
+                :placeholder="ui.settings.customMessagesEmpty"
+              />
+              <small class="field__hint custom-messages__vars">
+                {{ ui.settings.customMessagesVarHint(CUSTOM_MESSAGE_VARS[key]) }}
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div class="field ai-talk">
         <label class="field--switch">
@@ -738,6 +864,20 @@ function sanitizeAiTalkHeaders(headers: Record<string, string>) {
             <span>{{ ui.typingSpeedLabels[TYPING_SPEED_PRESET.FASTEST] }}</span>
           </label>
         </div>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="bubble-duration-input">{{ ui.settings.bubbleDurationLabel }}</label>
+        <input
+          id="bubble-duration-input"
+          v-model.number="form.bubbleDurationSecs"
+          class="field__input field__input--short"
+          type="number"
+          min="1"
+          max="60"
+          step="1"
+        >
+        <small class="field__hint">{{ ui.settings.bubbleDurationHint }}</small>
       </div>
 
       <div class="field">
@@ -1151,7 +1291,7 @@ function sanitizeAiTalkHeaders(headers: Record<string, string>) {
 }
 
 .advanced-toggle__chevron {
-  width: 8px;
+  width: 13px;
   height: 8px;
   border-right: 2px solid #617a78;
   border-bottom: 2px solid #617a78;
@@ -1161,6 +1301,58 @@ function sanitizeAiTalkHeaders(headers: Record<string, string>) {
 
 .advanced-toggle__chevron--open {
   transform: rotate(225deg);
+}
+
+.custom-messages {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.custom-messages__content {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid rgba(70, 107, 105, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.5);
+  display: grid;
+  gap: 12px;
+}
+
+.custom-messages__tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.custom-messages__tab {
+  padding: 6px 14px;
+  border: 1px solid rgba(70, 107, 105, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  color: #33514f;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.custom-messages__tab--active {
+  background: #33514f;
+  color: #fff;
+  border-color: #33514f;
+}
+
+.custom-messages__fields {
+  display: grid;
+  gap: 12px;
+}
+
+.custom-messages__fields .field + .field {
+  margin-top: 0;
+}
+
+.custom-messages__vars {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.01em;
 }
 
 .model-picker,

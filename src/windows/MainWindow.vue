@@ -11,6 +11,7 @@ import { useContextMenu } from '../composables/useContextMenu'
 import { useMainWindowLive2d } from '../composables/useMainWindowLive2d'
 import { limitAiTalkBubbleText, useSpeechBubble } from '../composables/useSpeechBubble'
 import { formatAgentLabel, getDefaultCommanderTitle, getLanguageCopy } from '../i18n'
+import { buildPetMessages } from '../petMessages'
 import { AGENT_STATE } from '../types/agent'
 
 const props = defineProps<{
@@ -57,6 +58,12 @@ const effectiveCommanderTitle = computed(() => (
   || getDefaultCommanderTitle(props.bootstrap.settings.language)
 ))
 
+const petMessages = computed(() => buildPetMessages(
+  props.bootstrap.settings.customMessages,
+  props.bootstrap.settings.language,
+  ui.value.pet,
+))
+
 const {
   playState,
   refreshCurrentState,
@@ -70,7 +77,10 @@ const {
   getFallbackMotionGroups: () => props.bootstrap.modelScan.availableMotionGroups,
   onModelReady: () => {
     if (props.bootstrap.settings.idleGreeting) {
-      say(randomGreeting(), 2800, props.bootstrap.settings.typingSpeed)
+      const greeting = randomGreeting()
+      if (greeting) {
+        say(greeting, bubbleDurationMs(), props.bootstrap.settings.typingSpeed)
+      }
       startIdleGreetingLoop()
     }
     void refreshCurrentState()
@@ -78,11 +88,12 @@ const {
 })
 
 function greetingLines(name: string) {
-  return ui.value.pet.greetings(name, effectiveCommanderTitle.value)
+  return petMessages.value.greetings(name, effectiveCommanderTitle.value)
 }
 
-function randomGreeting() {
+function randomGreeting(): string {
   const lines = greetingLines(props.bootstrap.settings.name)
+  if (lines.length === 0) return ''
   return lines[Math.floor(Math.random() * lines.length)]
 }
 
@@ -103,19 +114,19 @@ function bubbleTextForState(state: TAgentState) {
   const name = props.bootstrap.settings.name
   const agentLabel = currentAgentLabel()
   if (state === AGENT_STATE.THINKING) {
-    return ui.value.pet.thinking(agentLabel, name)
+    return petMessages.value.thinking(agentLabel, name)
   }
   if (state === AGENT_STATE.TOOL_USE) {
-    return ui.value.pet.toolUse(agentLabel, name, sessionInfo.value.toolName)
+    return petMessages.value.toolUse(agentLabel, name, sessionInfo.value.toolName)
   }
   if (state === AGENT_STATE.ERROR) {
-    return ui.value.pet.error(agentLabel, name)
+    return petMessages.value.error(agentLabel, name)
   }
   if (state === AGENT_STATE.COMPLETE) {
-    return ui.value.pet.complete(agentLabel, name)
+    return petMessages.value.complete(agentLabel, name)
   }
   if (state === AGENT_STATE.NEEDS_ATTENTION) {
-    return ui.value.pet.needsAttention(agentLabel, name, effectiveCommanderTitle.value)
+    return petMessages.value.needsAttention(agentLabel, name, effectiveCommanderTitle.value)
   }
   return ''
 }
@@ -160,9 +171,13 @@ function isAiTalkTerminalState(state: TAgentState) {
   return state === AGENT_STATE.COMPLETE || state === AGENT_STATE.ERROR
 }
 
-function showStateBubble(text: string, duration = 2200) {
+function bubbleDurationMs() {
+  return props.bootstrap.settings.bubbleDurationSecs * 1000
+}
+
+function showStateBubble(text: string) {
   lastStateBubbleShownAt = Date.now()
-  say(text, duration, props.bootstrap.settings.typingSpeed)
+  say(text, bubbleDurationMs(), props.bootstrap.settings.typingSpeed)
 }
 
 async function showAiTalkOrFallback(state: TAgentState, fallbackText: string) {
@@ -207,7 +222,7 @@ async function showAiTalkOrFallback(state: TAgentState, fallbackText: string) {
       : fallbackText
 
     if (text) {
-      showStateBubble(text, response?.text ? 2800 : 2200)
+      showStateBubble(text)
     }
   } catch (error) {
     console.warn('failed to generate AI Talk bubble', error)
@@ -245,7 +260,10 @@ function startIdleGreetingLoop() {
     if (currentState.value !== AGENT_STATE.IDLE) {
       return
     }
-    say(randomGreeting(), 2600, props.bootstrap.settings.typingSpeed)
+    const greeting = randomGreeting()
+    if (greeting) {
+      say(greeting, bubbleDurationMs(), props.bootstrap.settings.typingSpeed)
+    }
   }, 18000)
 }
 
@@ -322,13 +340,13 @@ watch([currentState, stateBubbleText, aiTalkTriggerKey], ([state, text, triggerK
 
   if (state === AGENT_STATE.IDLE) {
     if (previousState && previousState !== AGENT_STATE.IDLE) {
-      showStateBubble(
-        ui.value.pet.idleResume(
-          currentAgentLabel(),
-          props.bootstrap.settings.name,
-        ),
-        2600,
+      const resumeText = petMessages.value.idleResume(
+        currentAgentLabel(),
+        props.bootstrap.settings.name,
       )
+      if (resumeText) {
+        showStateBubble(resumeText, 2600)
+      }
     }
     return
   }
