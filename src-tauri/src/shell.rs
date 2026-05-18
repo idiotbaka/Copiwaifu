@@ -858,7 +858,7 @@ fn open_or_focus_settings_window(app_handle: &AppHandle) -> Result<(), String> {
         WebviewUrl::App("index.html".into()),
     )
     .title(settings_window_title(current_language(app_handle)))
-    .inner_size(420.0, 620.0)
+    .inner_size(840.0, 680.0)
     .resizable(false)
     .focused(true)
     .build()

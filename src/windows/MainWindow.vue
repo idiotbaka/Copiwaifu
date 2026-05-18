@@ -345,7 +345,7 @@ watch([currentState, stateBubbleText, aiTalkTriggerKey], ([state, text, triggerK
         props.bootstrap.settings.name,
       )
       if (resumeText) {
-        showStateBubble(resumeText, 2600)
+        showStateBubble(resumeText)
       }
     }
     return
