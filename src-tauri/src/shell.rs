@@ -120,6 +120,8 @@ pub struct AiTalkSettings {
     pub headers: BTreeMap<String, String>,
     #[serde(default)]
     pub provider_profiles: BTreeMap<String, AiTalkProviderProfile>,
+    #[serde(default)]
+    pub system_prompt: Option<String>,
 }
 
 impl Default for AiTalkSettings {
@@ -132,6 +134,7 @@ impl Default for AiTalkSettings {
             base_url: None,
             headers: BTreeMap::new(),
             provider_profiles: BTreeMap::new(),
+            system_prompt: None,
         }
     }
 }
@@ -679,6 +682,10 @@ fn sanitize_ai_talk_settings(mut settings: AiTalkSettings) -> AiTalkSettings {
             headers: settings.headers.clone(),
         },
     );
+    settings.system_prompt = settings
+        .system_prompt
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
 
     settings
 }

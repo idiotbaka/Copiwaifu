@@ -57,6 +57,9 @@ type LanguageCopy = {
     aiTalkHeadersPlaceholder: string
     aiTalkHeadersHint: string
     aiTalkHeadersInvalid: string
+    aiTalkSystemPromptLabel: string
+    aiTalkSystemPromptHint: string
+    aiTalkSystemPromptVarHint: string
     languageLabel: string
     nameLabel: string
     namePlaceholder: string
@@ -163,6 +166,9 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       aiTalkHeadersPlaceholder: '{\n  "HTTP-Referer": "https://example.com"\n}',
       aiTalkHeadersHint: 'Use JSON only when the service requires extra headers such as appid, referer, or routing metadata.',
       aiTalkHeadersInvalid: 'Custom headers must be a JSON object whose values are strings.',
+      aiTalkSystemPromptLabel: 'Custom System Prompt',
+      aiTalkSystemPromptHint: 'Overrides the system prompt sent to the AI. Clear to restore the built-in default.',
+      aiTalkSystemPromptVarHint: 'Variables: {name}  {commanderTitle}  {languageName}  {maxLength}',
       languageLabel: 'Language',
       nameLabel: 'Character Name',
       namePlaceholder: 'Yulia',
@@ -303,6 +309,9 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       aiTalkHeadersPlaceholder: '{\n  "HTTP-Referer": "https://example.com"\n}',
       aiTalkHeadersHint: '仅当服务商要求 appid、referer、路由标记等额外 header 时填写，格式必须是 JSON。',
       aiTalkHeadersInvalid: '自定义请求头必须是 JSON 对象，且值必须是字符串。',
+      aiTalkSystemPromptLabel: '自定义系统提示词',
+      aiTalkSystemPromptHint: '覆盖发送给 AI 的系统提示词，留空则恢复为内置默认提示词。',
+      aiTalkSystemPromptVarHint: '可用变量：{name}  {commanderTitle}  {languageName}  {maxLength}',
       languageLabel: '语言',
       nameLabel: '角色名',
       namePlaceholder: 'Yulia',
@@ -443,6 +452,9 @@ const LANGUAGE_COPY: Record<AppLanguage, LanguageCopy> = {
       aiTalkHeadersPlaceholder: '{\n  "HTTP-Referer": "https://example.com"\n}',
       aiTalkHeadersHint: 'appid、referer、ルーティング情報など追加ヘッダーが必要なサービスでのみ JSON 形式で入力します。',
       aiTalkHeadersInvalid: 'カスタムヘッダーは、値が文字列の JSON オブジェクトである必要があります。',
+      aiTalkSystemPromptLabel: 'カスタムシステムプロンプト',
+      aiTalkSystemPromptHint: 'AIに送るシステムプロンプトをカスタマイズします。空欄にすると組み込みのデフォルトを使います。',
+      aiTalkSystemPromptVarHint: '使用可能：{name}  {commanderTitle}  {languageName}  {maxLength}',
       languageLabel: '言語',
       nameLabel: 'キャラクター名',
       namePlaceholder: 'Yulia',

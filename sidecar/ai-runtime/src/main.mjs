@@ -176,7 +176,7 @@ async function generateAiTalk(request) {
   const context = request.context
   const languageName = languageLabel(request.language)
   const maxLength = Number(request.maxLength) || 42
-  const system = buildSystemPrompt(request.characterName, languageName, maxLength)
+  const system = buildSystemPrompt(config, request.characterName, request.commanderTitle, languageName, maxLength)
   const prompt = buildUserPrompt(context, languageName, maxLength)
   const providerOptions = buildProviderOptions(config, { thinkingEnabled: true })
   const temperature = temperatureForProvider(config)
@@ -335,21 +335,28 @@ function normalizeBaseUrl(value) {
   return String(value || '').trim().replace(/\/+$/, '').toLowerCase()
 }
 
-function buildSystemPrompt(characterName, languageName, maxLength) {
+const DEFAULT_SYSTEM_PROMPT_TEMPLATE = [
+  'You are {name}, an adorable anime-style desktop pet living on the developer\'s screen.',
+  'You speak in a cute, cheerful tone like a supportive kouhai character from a slice-of-life anime.',
+  'Your personality blends genuine warmth with playful energy — you can explain technical outcomes simply, hint at next steps, show curiosity about the project, or just be a comforting presence.',
+  'IMPORTANT: Be creative and natural. Never use fixed templates or repetitive patterns. Vary your vocabulary, sentence structure, and openings every time — imagine a real person texting, not a bot filling in blanks.',
+  'Reply in {languageName}.',
+  'Write exactly one short bubble sentence.',
+  'Pick ONE kaomoji that matches the mood — rotate across: (｡◕‿◕｡) (◕ᴗ◕✿) (╥﹏╥) ヾ(≧▽≦*)o (*≧ω≦) (ﾉ´ヮ`)ﾉ*:・ﾟ✧ (´・ω・`) (๑•̀ㅂ•́)و✧ ₍ᐢ..ᐢ₎♡ (ノ◕ヮ◕)ノ*:・ﾟ✧ — avoid repeating the same one.',
+  'Use only the session metadata provided by the app.',
+  'Do not claim you read full chat logs, files, source code, or hidden context.',
+  'Do not use Markdown, lists, code blocks, headings, or multiple paragraphs.',
+  'Keep the answer within {maxLength} visible characters (kaomoji counts toward the limit).',
+].join('\n')
+
+function buildSystemPrompt(config, characterName, commanderTitle, languageName, maxLength) {
+  const template = config.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT_TEMPLATE
   const name = characterName || 'Yulia'
-  return [
-    `You are ${name}, an adorable anime-style desktop pet living on the developer's screen.`,
-    'You speak in a cute, cheerful tone like a supportive kouhai character from a slice-of-life anime.',
-    'Your personality blends genuine warmth with playful energy — you can explain technical outcomes simply, hint at next steps, show curiosity about the project, or just be a comforting presence.',
-    'IMPORTANT: Be creative and natural. Never use fixed templates or repetitive patterns. Vary your vocabulary, sentence structure, and openings every time — imagine a real person texting, not a bot filling in blanks.',
-    `Reply in ${languageName}.`,
-    'Write exactly one short bubble sentence.',
-    'Pick ONE kaomoji that matches the mood — rotate across: (｡◕‿◕｡) (◕ᴗ◕✿) (╥﹏╥) ヾ(≧▽≦*)o (*≧ω≦) (ﾉ´ヮ`)ﾉ*:・ﾟ✧ (´・ω・`) (๑•̀ㅂ•́)و✧ ₍ᐢ..ᐢ₎♡ (ノ◕ヮ◕)ノ*:・ﾟ✧ — avoid repeating the same one.',
-    'Use only the session metadata provided by the app.',
-    'Do not claim you read full chat logs, files, source code, or hidden context.',
-    'Do not use Markdown, lists, code blocks, headings, or multiple paragraphs.',
-    `Keep the answer within ${maxLength} visible characters (kaomoji counts toward the limit).`,
-  ].join('\n')
+  return template
+    .replace(/\{name\}/g, name)
+    .replace(/\{commanderTitle\}/g, commanderTitle || name)
+    .replace(/\{languageName\}/g, languageName)
+    .replace(/\{maxLength\}/g, String(maxLength))
 }
 
 const COMPLETE_STRATEGIES = [

@@ -24,6 +24,7 @@ import {
   APP_LANGUAGE,
   BUBBLE_THEME_PRESETS,
   CUSTOM_PET_MESSAGE_KEYS,
+  DEFAULT_AI_TALK_SYSTEM_PROMPT,
   createDefaultAiTalkSettings,
   createDefaultBubbleTheme,
   createEmptyActionGroupBindings,
@@ -178,6 +179,8 @@ function createFormState(settings: AppSettings): AppSettings {
     headers: { ...aiTalk.headers },
   }
 
+  aiTalk.systemPrompt = settings.aiTalk?.systemPrompt ?? DEFAULT_AI_TALK_SYSTEM_PROMPT
+
   return {
     name: settings.name,
     language: settings.language,
@@ -220,6 +223,7 @@ function applySettings(settings: AppSettings) {
     form.aiTalk.baseUrl = next.aiTalk.baseUrl
     form.aiTalk.headers = { ...next.aiTalk.headers }
     form.aiTalk.providerProfiles = cloneAiTalkProviderProfiles(next.aiTalk.providerProfiles)
+    form.aiTalk.systemPrompt = next.aiTalk.systemPrompt
     aiTalkHeadersText.value = JSON.stringify(next.aiTalk.headers, null, 2)
     aiTalkAdvancedOpen.value = shouldOpenAiTalkAdvanced(next.aiTalk)
     form.bubbleTheme = { ...(next.bubbleTheme ?? createDefaultBubbleTheme()) }
@@ -240,9 +244,12 @@ function shouldOpenAiTalkAdvanced(settings: AppSettings['aiTalk']) {
   const defaultBaseUrl = AI_TALK_DEFAULT_BASE_URLS[settings.provider]
   const hasCustomBaseUrl = Boolean(settings.baseUrl?.trim())
     && normalizeAiTalkBaseUrl(settings.baseUrl) !== normalizeAiTalkBaseUrl(defaultBaseUrl)
+  const hasCustomSystemPrompt = Boolean(settings.systemPrompt?.trim())
+    && settings.systemPrompt !== DEFAULT_AI_TALK_SYSTEM_PROMPT
   return settings.provider === 'openai-compatible'
     || hasCustomBaseUrl
     || Object.keys(settings.headers ?? {}).length > 0
+    || hasCustomSystemPrompt
 }
 
 function normalizeAiTalkBaseUrl(value: string | null | undefined) {
@@ -491,6 +498,7 @@ async function save() {
           baseUrl: form.aiTalk.baseUrl?.trim() || null,
           apiKey: form.aiTalk.apiKey.trim(),
           modelId: form.aiTalk.modelId.trim(),
+          systemPrompt: form.aiTalk.systemPrompt?.trim() || null,
           providerProfiles: sanitizeAiTalkProviderProfiles(form.aiTalk.providerProfiles),
         },
         customMessages: buildCustomMessagesConfig(),
@@ -779,6 +787,18 @@ function sanitizeAiTalkHeaders(headers: Record<string, string>) {
                 :placeholder="ui.settings.aiTalkHeadersPlaceholder"
               />
               <small class="field__hint">{{ ui.settings.aiTalkHeadersHint }}</small>
+            </label>
+
+            <label class="field">
+              <span class="field__label">{{ ui.settings.aiTalkSystemPromptLabel }}</span>
+              <textarea
+                v-model="form.aiTalk.systemPrompt"
+                class="field__textarea field__textarea--prompt"
+                spellcheck="false"
+                rows="11"
+              />
+              <small class="field__hint">{{ ui.settings.aiTalkSystemPromptHint }}</small>
+              <small class="field__hint custom-messages__vars">{{ ui.settings.aiTalkSystemPromptVarHint }}</small>
             </label>
           </div>
         </div>
@@ -1353,6 +1373,12 @@ function sanitizeAiTalkHeaders(headers: Record<string, string>) {
 .custom-messages__vars {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   letter-spacing: 0.01em;
+}
+
+.field__textarea--prompt {
+  min-height: 200px;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .model-picker,

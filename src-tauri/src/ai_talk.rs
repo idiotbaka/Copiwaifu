@@ -43,6 +43,7 @@ struct SidecarRequest {
     window_size: WindowSizePreset,
     max_length: usize,
     character_name: String,
+    commander_title: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -53,6 +54,7 @@ struct SidecarModelConfig {
     model_id: String,
     base_url: Option<String>,
     headers: BTreeMap<String, String>,
+    system_prompt: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -83,12 +85,18 @@ pub async fn generate_ai_talk(
     shell: State<'_, ShellStore>,
     navigator: State<'_, NavigatorStore>,
 ) -> Result<Option<AiTalkGenerateResponse>, String> {
-    let (config, character_name) = {
+    let (config, character_name, commander_title) = {
         let shell_state = shell.0.lock().map_err(|err| err.to_string())?;
         let Some(config) = build_model_config(&shell_state.settings.ai_talk) else {
             return Ok(None);
         };
-        (config, shell_state.settings.name.clone())
+        let title = shell_state.settings.commander_title.trim().to_string();
+        let commander_title = if title.is_empty() {
+            default_commander_title(shell_state.settings.language)
+        } else {
+            title
+        };
+        (config, shell_state.settings.name.clone(), commander_title)
     };
 
     let context = {
@@ -113,6 +121,7 @@ pub async fn generate_ai_talk(
         window_size: request.window_size.clone(),
         max_length: max_ai_talk_length(&request.window_size, request.language),
         character_name,
+        commander_title,
     };
 
     eprintln!(
@@ -209,12 +218,14 @@ impl SidecarRequest {
                 "hasApiKey": !self.config.api_key.is_empty(),
                 "baseUrl": &self.config.base_url,
                 "headerKeys": self.config.headers.keys().collect::<Vec<_>>(),
+                "hasSystemPrompt": self.config.system_prompt.is_some(),
             },
             "context": &self.context,
             "language": self.language,
             "windowSize": &self.window_size,
             "maxLength": self.max_length,
             "characterName": &self.character_name,
+            "commanderTitle": &self.commander_title,
         })
     }
 }
@@ -234,18 +245,28 @@ fn build_model_config(settings: &AiTalkSettings) -> Option<SidecarModelConfig> {
         model_id: settings.model_id.clone(),
         base_url: settings.base_url.clone(),
         headers: settings.headers.clone(),
+        system_prompt: settings.system_prompt.clone(),
     })
 }
 
 fn run_sidecar(script_path: &Path, payload: &SidecarRequest) -> Result<SidecarRunOutput, String> {
     let input = serde_json::to_vec(payload).map_err(|err| err.to_string())?;
-    let mut child = Command::new("node")
-        .arg(script_path)
+
+    let mut cmd = Command::new("node");
+    cmd.arg(script_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|err| err.to_string())?;
+        .stderr(Stdio::piped());
+
+    // Prevent a CMD window from flashing on Windows when there is no attached console
+    // (i.e. in a packaged GUI build). CREATE_NO_WINDOW = 0x0800_0000.
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+
+    let mut child = cmd.spawn().map_err(|err| err.to_string())?;
 
     if let Some(stdin) = child.stdin.as_mut() {
         stdin.write_all(&input).map_err(|err| err.to_string())?;
@@ -321,6 +342,14 @@ fn resolve_sidecar_script(app_handle: &AppHandle) -> Option<PathBuf> {
     ]
     .into_iter()
     .find(|path| path.exists())
+}
+
+fn default_commander_title(language: AppLanguage) -> String {
+    match language {
+        AppLanguage::Chinese => "长官".to_string(),
+        AppLanguage::Japanese => "指揮官".to_string(),
+        AppLanguage::English => "Commander".to_string(),
+    }
 }
 
 fn max_ai_talk_length(window_size: &WindowSizePreset, language: AppLanguage) -> usize {
